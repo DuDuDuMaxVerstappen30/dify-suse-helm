@@ -1,0 +1,207 @@
+{{- if .Values.plugin_daemon.enabled }}
+{{- $dbInstance := include "dify.dbInstance" . | fromJson }}
+{{- $enterpriseDbName := include "dify.dbName" (dict "Values" .Values "credentialKey" "enterprise") }}
+{{- $pluginDbName := include "dify.dbName" (dict "Values" .Values "credentialKey" "plugin_daemon") }}
+{{- $app := .Values.plugin_connector.github.app -}}
+{{- $githubKeyFile := "app.pem" -}}
+{{- if $app -}}
+{{- $githubKeyFile = default "app.pem" $app.privateKeySecretKey -}}
+{{- end -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+{{- include "dify.labels" . | nindent 4 }}
+    app: {{ template "dify.fullname" . }}-plugin-connector
+  name: {{ template "dify.fullname" . }}-plugin-connector
+  namespace: {{ include "dify.pluginRuntimeNamespace" . }}
+spec:  
+  replicas: {{ .Values.plugin_connector.replicas }}
+  selector:
+    matchLabels:
+      app: {{ template "dify.fullname" . }}-plugin-connector
+{{- include "dify.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/plugin/plugin-connector-config.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/plugin/plugin-connector-secret.yaml") . | sha256sum }}
+      labels:
+{{- include "dify.selectorLabels" . | nindent 8 }}
+        app: {{ template "dify.fullname" . }}-plugin-connector
+{{- include "dify.podExtraLabels" . | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- if include "dify.hasImagePullSecrets" . }}
+      imagePullSecrets:
+{{ include "dify.imagePullSecrets" . | nindent 8 }}
+      {{- end }}
+      containers:
+        - command:
+            - ./plugin-connector
+            - '-conf'
+            - /config/config.yaml
+            - '-gconf'
+            - /config/gconfig.yaml
+          image: "{{ .Values.plugin_connector.image.repository }}:{{ default .Chart.AppVersion .Values.plugin_connector.image.tag }}"
+          imagePullPolicy: "IfNotPresent"
+          name: {{ template "dify.fullname" . }}-plugin-connector
+          env:
+            {{- if .Values.externalKubernetes.enabled }}
+            - name: USE_OTHER_CLUSTER
+              value: "true"
+            {{- end }}
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: DB_ENGINE
+              value: {{ $dbInstance.engine | quote }}
+            - name: DB_HOST
+              value: {{ $dbInstance.host | quote }}
+            - name: DB_PORT
+              value: {{ $dbInstance.port | toString | quote }}
+            - name: DB_TZ
+              value: {{ $dbInstance.timezone | quote }}
+            - name: DB_SSL_MODE
+              value: {{ $dbInstance.pg_ssl_mode | quote }}
+            - name: DB_URI_SCHEME
+              value: {{ $dbInstance.pg_uri_scheme | quote }}
+            - name: DB_EXTRAS
+              value: {{ $dbInstance.pg_extras | quote }}
+            - name: DB_PARAMS
+              value: {{ $dbInstance.mysql_params | quote }}
+            - name: DB_TLS
+              value: {{ $dbInstance.mysql_tls | toString | quote }}
+            - name: ENTERPRISE_DB_NAME
+              value: {{ $enterpriseDbName | quote }}
+            - name: ENTERPRISE_DB_USER
+              value: {{ (include "dify.dbCredentialUser" (dict "Values" .Values "credentialKey" "enterprise") | default $dbInstance.user) | quote }}
+            - name: ENTERPRISE_DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{- if .Values.global.autoGenerateSecrets }} {{ include "dify.runtimeCredentialsSecretName" . }}{{- else }} {{ template "dify.fullname" . }}-plugin-connector-secret{{- end }}
+                  key: ENTERPRISE_DB_PASS
+            - name: PLUGIN_DB_NAME
+              value: {{ $pluginDbName | quote }}
+            - name: PLUGIN_DB_USER
+              value: {{ (include "dify.dbCredentialUser" (dict "Values" .Values "credentialKey" "plugin_daemon") | default $dbInstance.user) | quote }}
+            - name: PLUGIN_DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{- if .Values.global.autoGenerateSecrets }} {{ include "dify.runtimeCredentialsSecretName" . }}{{- else }} {{ template "dify.fullname" . }}-plugin-connector-secret{{- end }}
+                  key: PLUGIN_DB_PASS
+            {{- if .Values.global.autoGenerateSecrets }}
+            - name: PLUGIN_CONNECTOR_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "dify.runtimeCredentialsSecretName" . }}
+                  key: PLUGIN_CONNECTOR_API_KEY
+            {{- end }}
+            - name: IMAGE_REPO_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "dify.fullname" . }}-plugin-connector-secret
+                  key: IMAGE_REPO_SECRET
+            - name: GITHUB_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "dify.fullname" . }}-plugin-connector-secret
+                  key: GITHUB_ACCESS_TOKEN
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "dify.fullname" . }}-plugin-connector-secret
+                  key: S3_ACCESS_KEY
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "dify.fullname" . }}-plugin-connector-secret
+                  key: S3_SECRET_KEY
+            - name: LOG_FORMAT
+              value: {{ .Values.global.log.outputFormat | default "json" | quote }}
+
+          ports:
+            - name: api
+              protocol: TCP
+              containerPort: 5004
+          volumeMounts:
+            - mountPath: /config/config.yaml
+              name: config-volume
+              subPath: config.yaml
+            - mountPath: /config/gconfig.yaml
+              name: secret-volume
+              subPath: gconfig.yaml
+            {{- if .Values.externalKubernetes.enabled }}
+            - name: kubeconfig
+              mountPath: /app/.kube
+              readOnly: true
+            {{- end }}
+{{- if and $app $app.enabled }}
+            - mountPath: /app/github
+              name: github-app-key
+              readOnly: true
+{{- end }}
+          resources:
+            {{- toYaml .Values.plugin_connector.resources | nindent 14 }}
+      serviceAccountName: {{ include "dify.pluginConnectorServiceAccountName" . }}
+      volumes:
+        - configMap:
+            defaultMode: 420
+            name: {{ template "dify.fullname" . }}-plugin-connector-config
+            items:
+              - key: config.yaml
+                path: config.yaml
+          name: config-volume
+        - secret:
+            defaultMode: 420
+            secretName: {{ template "dify.fullname" . }}-plugin-connector-secret
+            items:
+              - key: gconfig.yaml
+                path: gconfig.yaml
+          name: secret-volume
+        {{- if .Values.externalKubernetes.enabled }}
+        - name: kubeconfig
+          secret:
+            secretName: {{ .Values.plugin_connector.kube.config.secret.name | quote }}
+            items:
+              - key: {{ .Values.plugin_connector.kube.config.secret.key | default "config" | quote }}
+                path: config
+        {{- end }}
+{{- if and $app $app.enabled }}
+        - secret:
+            defaultMode: 256
+            secretName: dify-connector-github-app-private-key
+            items:
+              - key: {{ $githubKeyFile }}
+                path: {{ $githubKeyFile }}
+          name: github-app-key
+{{- end }}
+    {{- if .Values.plugin_connector.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.plugin_connector.nodeSelector | indent 8 }}
+    {{- end }}
+    {{- if .Values.plugin_connector.affinity }}
+      affinity:
+{{ toYaml .Values.plugin_connector.affinity | indent 8 }}
+    {{- end }}
+    {{- if .Values.plugin_connector.tolerations }}
+      tolerations:
+{{ toYaml .Values.plugin_connector.tolerations | indent 8 }}
+    {{- end }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "dify.fullname" . }}-plugin-connector-svc
+  namespace: {{ include "dify.pluginRuntimeNamespace" . }}
+spec:
+  ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 5004
+  selector:
+    app: {{ template "dify.fullname" . }}-plugin-connector
+  type: ClusterIP
+{{- end }}

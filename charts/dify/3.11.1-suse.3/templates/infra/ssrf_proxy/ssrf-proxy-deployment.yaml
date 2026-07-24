@@ -1,0 +1,90 @@
+{{- if .Values.ssrfProxy.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+{{- include "dify.labels" . | nindent 4 }}
+    app: {{ template "dify.fullname" . }}-ssrf-proxy
+  name: {{ template "dify.fullname" . }}-ssrf-proxy
+spec:
+  replicas: {{ .Values.ssrfProxy.replicas }}
+  selector:
+    matchLabels:
+{{- include "dify.selectorLabels" . | nindent 6 }}
+      app: {{ template "dify.fullname" . }}-ssrf-proxy
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/infra/ssrf_proxy/ssrf-proxy-config.yaml") . | sha256sum }}
+      labels:
+{{- include "dify.selectorLabels" . | nindent 8 }}
+        app: {{ template "dify.fullname" . }}-ssrf-proxy
+{{- include "dify.podExtraLabels" . | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- if include "dify.hasImagePullSecrets" . }}
+      imagePullSecrets:
+{{ include "dify.imagePullSecrets" . | nindent 8 }}
+      {{- end }}
+      {{- if include "dify.customCA.enabled" . }}
+      initContainers:
+      {{ include "dify.customCA.initContainer" . | nindent 6 }}
+      {{- end }}
+      containers:
+      - image: "{{ .Values.ssrfProxy.image.repository }}:{{ .Values.ssrfProxy.image.tag }}"
+        imagePullPolicy: "IfNotPresent"
+        name: {{ template "dify.fullname" . }}-ssrf-proxy
+        {{- if .Values.ssrfProxy.extraEnv }}
+        env:
+          {{- toYaml .Values.ssrfProxy.extraEnv | nindent 8 }}
+        {{- end }}
+        {{- if include "dify.customCA.enabled" . }}
+        envFrom:
+          - configMapRef:
+              name: {{ include "dify.customCA.configName" . }}
+        {{- end }}
+        ports:
+          - name: ssrf-proxy
+            containerPort: 3128
+            protocol: TCP
+        volumeMounts:
+          - mountPath: /etc/squid/squid.conf
+            name: squid-config
+            subPath: squid.conf
+          {{- if include "dify.customCA.enabled" . }}
+          {{ include "dify.customCA.volumeMount" . | nindent 10 }}
+          {{- end }}
+        {{- if .Values.ssrfProxy.readinessProbe }}
+        readinessProbe:
+          {{- toYaml .Values.ssrfProxy.readinessProbe | nindent 12 }}
+        {{- end }}
+        {{- if .Values.ssrfProxy.livenessProbe }}
+        livenessProbe:
+          {{- toYaml .Values.ssrfProxy.livenessProbe | nindent 12 }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.ssrfProxy.resources | nindent 12 }}
+    {{- if .Values.ssrfProxy.serviceAccountName }}
+      serviceAccountName: {{ .Values.ssrfProxy.serviceAccountName | quote }}
+    {{- end }}
+    {{- if .Values.ssrfProxy.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.ssrfProxy.nodeSelector | indent 8 }}
+    {{- end }}
+    {{- if .Values.ssrfProxy.affinity }}
+      affinity:
+{{ toYaml .Values.ssrfProxy.affinity | indent 8 }}
+    {{- end }}
+    {{- if .Values.ssrfProxy.tolerations }}
+      tolerations:
+{{ toYaml .Values.ssrfProxy.tolerations | indent 8 }}
+    {{- end }}
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: {{ template "dify.fullname" . }}-squid-config
+        name: squid-config
+      {{- if include "dify.customCA.enabled" . }}
+      {{ include "dify.customCA.volume" . | nindent 6 }}
+      {{- end }}
+{{- end }}

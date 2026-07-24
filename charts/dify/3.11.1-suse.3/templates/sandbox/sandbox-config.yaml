@@ -1,0 +1,17 @@
+{{- if .Values.sandbox.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "dify.fullname" . }}-sandbox-config
+data:
+  GIN_MODE: "release"
+  MAX_WORKERS: {{ .Values.sandbox.maxWorkers | toString | quote }}
+  MAX_REQUESTS: {{ .Values.sandbox.maxRequests | toString | quote }}
+  WORKER_TIMEOUT: {{ .Values.sandbox.workerTimeout | toString | quote }}
+  ENABLE_NETWORK: "true"
+  python-requirements.txt: {{ .Values.sandbox.pythonRequirements | quote }}
+{{- if .Values.ssrfProxy.enabled }}
+  HTTP_PROXY: "http://{{ template "dify.fullname" . }}-ssrf-proxy-svc:3128"
+  HTTPS_PROXY: "http://{{ template "dify.fullname" . }}-ssrf-proxy-svc:3128"
+{{- end }}
+{{- end }}

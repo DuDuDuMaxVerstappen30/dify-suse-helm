@@ -1,0 +1,9 @@
+{{- if and .Values.web.enabled .Values.web.logoConfig.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "dify.fullname" . }}-web-config-for-logo
+data:
+  favicon.ico.base64: {{ .Values.web.logoConfig.faviconIcoBase64 }}
+  logo-site.png.base64: {{ .Values.web.logoConfig.logoSitePngBase64 }}
+{{- end }}

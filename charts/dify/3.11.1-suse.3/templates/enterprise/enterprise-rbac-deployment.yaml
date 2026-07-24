@@ -1,0 +1,94 @@
+{{- if .Values.enterpriseRbac.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+{{- include "dify.labels" . | nindent 4 }}
+    app: {{ template "dify.fullname" . }}-enterprise-rbac
+  name: {{ template "dify.fullname" . }}-enterprise-rbac
+spec:
+  replicas: {{ .Values.enterpriseRbac.replicas }}
+  selector:
+    matchLabels:
+{{- include "dify.selectorLabels" . | nindent 6 }}
+      app: {{ template "dify.fullname" . }}-enterprise-rbac
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/enterprise/enterprise-rbac-config.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/enterprise/enterprise-rbac-secret.yaml") . | sha256sum }}
+      labels:
+{{- include "dify.selectorLabels" . | nindent 8 }}
+        app: {{ template "dify.fullname" . }}-enterprise-rbac
+{{- include "dify.podExtraLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Values.enterpriseRbac.serviceAccountName | quote }}
+      enableServiceLinks: false
+      {{- if include "dify.hasImagePullSecrets" . }}
+      imagePullSecrets:
+{{ include "dify.imagePullSecrets" . | nindent 8 }}
+      {{- end }}
+      {{- if include "dify.customCA.enabled" . }}
+      initContainers:
+      {{ include "dify.customCA.initContainer" . | nindent 6 }}
+      {{- end }}
+      containers:
+      - image: "{{ .Values.enterpriseRbac.image.repository }}:{{ required "enterpriseRbac.image.tag is required (e.g. <git-short-sha>-<arch>); .Chart.AppVersion is not a valid tag for enterprise_rbac" .Values.enterpriseRbac.image.tag }}"
+        imagePullPolicy: "IfNotPresent"
+        name: {{ template "dify.fullname" . }}-enterprise-rbac
+        env:
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        {{- if .Values.enterpriseRbac.extraEnv }}
+        {{- toYaml .Values.enterpriseRbac.extraEnv | nindent 10 }}
+        {{- end }}
+        envFrom:
+          - configMapRef:
+              name: {{ template "dify.fullname" . }}-enterprise-rbac-config
+          - secretRef:
+              name: {{ template "dify.fullname" . }}-enterprise-rbac-secret
+          {{- if include "dify.customCA.enabled" . }}
+          - configMapRef:
+              name: {{ include "dify.customCA.configName" . }}
+          {{- end }}
+          {{- if .Values.global.autoGenerateSecrets }}
+          - secretRef:
+              name: {{ include "dify.runtimeCredentialsSecretName" . }}
+          {{- end }}
+        ports:
+          - name: rbac
+            containerPort: 8086
+            protocol: TCP
+        {{- if .Values.enterpriseRbac.readinessProbe }}
+        readinessProbe:
+          {{- toYaml .Values.enterpriseRbac.readinessProbe | nindent 12 }}
+        {{- end }}
+        {{- if .Values.enterpriseRbac.livenessProbe }}
+        livenessProbe:
+          {{- toYaml .Values.enterpriseRbac.livenessProbe | nindent 12 }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.enterpriseRbac.resources | nindent 12 }}
+        {{- if include "dify.customCA.enabled" . }}
+        volumeMounts:
+        {{ include "dify.customCA.volumeMount" . | nindent 8 }}
+        {{- end }}
+    {{- if include "dify.customCA.enabled" . }}
+      volumes:
+      {{ include "dify.customCA.volume" . | nindent 6 }}
+    {{- end }}
+    {{- if .Values.enterpriseRbac.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.enterpriseRbac.nodeSelector | indent 8 }}
+    {{- end }}
+    {{- if .Values.enterpriseRbac.affinity }}
+      affinity:
+{{ toYaml .Values.enterpriseRbac.affinity | indent 8 }}
+    {{- end }}
+    {{- if .Values.enterpriseRbac.tolerations }}
+      tolerations:
+{{ toYaml .Values.enterpriseRbac.tolerations | indent 8 }}
+    {{- end }}
+{{- end }}

@@ -1,0 +1,88 @@
+{{- $runtimeNamespace := include "dify.pluginRuntimeNamespace" . }}
+{{- $serviceAccountName := include "dify.pluginConnectorServiceAccountName" . }}
+{{- $roleName := printf "%s-plugin-connector-role" (include "dify.fullname" .) }}
+{{- $roleBindingName := printf "%s-plugin-connector-rolebinding" (include "dify.fullname" .) }}
+{{- $clusterRoleName := printf "%s-plugin-connector-clusterrole" (include "dify.fullname" .) }}
+{{- $clusterRoleBindingName := printf "%s-plugin-connector-clusterrolebinding" (include "dify.fullname" .) }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: {{ template "dify.fullname" . }}-plugin-connector
+  name: {{ $serviceAccountName }}
+  namespace: {{ $runtimeNamespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $roleName }}
+  namespace: {{ $runtimeNamespace }}
+  labels:
+    app: {{ template "dify.fullname" . }}-plugin-connector
+rules:
+- apiGroups:
+  - enterprise.dify.ai
+  resources:
+  - difyplugins
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - enterprise.dify.ai
+  resources:
+  - difyplugins/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - enterprise.dify.ai
+  resources:
+  - difyplugins/status
+  verbs:
+  - get
+  - patch
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $roleBindingName }}
+  namespace: {{ $runtimeNamespace }}
+  labels:
+    app: {{ template "dify.fullname" . }}-plugin-connector
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $roleName }}
+subjects:
+- kind: ServiceAccount
+  name: {{ $serviceAccountName }}
+  namespace: {{ $runtimeNamespace }}
+{{- if .Values.global.pluginDr.enabled | default false }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $clusterRoleName }}
+rules:
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $clusterRoleBindingName }}
+subjects:
+- kind: ServiceAccount
+  name: {{ $serviceAccountName }}
+  namespace: {{ $runtimeNamespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ $clusterRoleName }}
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

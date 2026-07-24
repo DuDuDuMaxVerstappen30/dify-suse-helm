@@ -1,0 +1,404 @@
+{{- define "dify.caddy.common_header" }}
+    header {
+        -Server
+        -X-Powered-By
+        -Via
+        Strict-Transport-Security "max-age=31536000;"
+        Content-Security-Policy "frame-ancestors 'none';"
+    }
+{{- end }}
+
+{{- define "dify.caddy.common_transport" }}
+    reverse_proxy {
+        transport http {
+            dial_timeout {{ .Values.gateway.transport.dialTimeout | default "30s" }}
+            keepalive {{ .Values.gateway.transport.keepalive | default "30s" }}
+            keepalive_interval {{ .Values.gateway.transport.keepaliveInterval | default "30s" }}
+        }
+    }
+{{- end }}
+
+{{- define "dify.caddy.common_log" }}
+    log default {
+        output stdout
+        format filter {
+            fields {
+                {{- if .Values.gateway.log.filterFields }}
+                {{ range .Values.gateway.log.filterFields }}
+                {{ . }}
+                {{ end }}
+                {{- end }}
+            }
+            wrap schema {
+                service gateway
+            }
+        }
+        level INFO
+    }
+{{- end }}
+
+{{- define "dify.caddy.audit" }}
+{{- if .Values.global.autoGenerateSecrets }}
+    dify_audit "{$DIFY_REDIS_DSN}" 7
+{{- else }}
+    dify_audit {{ include "dify.redis.dsn" . | replace "\n" "" | quote }} 7
+{{- end }}
+{{- end }}
+
+{{- define "dify.caddy.credential_patcher" }}
+{{- if .Values.global.autoGenerateSecrets }}
+    dify_credential_patcher "{$DIFY_REDIS_DSN}"
+{{- else }}
+    dify_credential_patcher {{ include "dify.redis.dsn" . | replace "\n" "" | quote }}
+{{- end }}
+{{- end }}
+
+{{- define "dify.caddy.rbac_enterprise_gates" }}
+    {{- $name := include "dify.fullname" . }}
+    {{- $rbacSvc := printf "http://%s-enterprise-rbac-svc:8086" $name }}
+    handle /v1/dashboard/api/rbac/* {
+        reverse_proxy {{ $rbacSvc }}
+    }
+{{- end }}
+
+{{- if .Values.gateway.enabled }}
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "dify.fullname" . }}-gateway-config
+  namespace: {{ default "default" .Release.Namespace }}
+data:
+  Caddyfile: |
+    (cors) {
+        @cors_preflight method OPTIONS
+        @allow_origins {
+          {{ if .Values.gateway.allowOrigins }}
+            {{ range $origin := .Values.gateway.allowOrigins }}
+          header Origin {{ $origin }}
+            {{ end }}
+          {{ end }}
+          header Origin {{ include "dify.externalUrl" (dict "domain" .Values.global.consoleApiDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) }}
+          header Origin {{ include "dify.externalUrl" (dict "domain" .Values.global.enterpriseDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) }}
+          header Origin {{ include "dify.externalUrl" (dict "domain" .Values.global.appApiDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) }}
+          header Origin {{ include "dify.externalUrl" (dict "domain" .Values.global.appWebDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) }}
+          header Origin {{ include "dify.externalUrl" (dict "domain" .Values.global.filesDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) }}
+          header Origin {{ include "dify.externalUrl" (dict "domain" .Values.global.serviceApiDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) }}
+          header Origin {{ include "dify.externalUrl" (dict "domain" .Values.global.triggerDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) }}
+          {{- if .Values.global.pluginDaemonDomain }}
+          header Origin {{ include "dify.externalUrl" (dict "domain" .Values.global.pluginDaemonDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) }}
+          {{- end }}
+        }
+        header @allow_origins {
+          defer
+          Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+          Vary Origin
+          Access-Control-Allow-Headers "Content-Type, Authorization, X-CSRF-Token, X-Workspace-Id"
+          Access-Control-Allow-Credentials "true"
+          Access-Control-Allow-Origin {header.origin}
+        }
+        handle @cors_preflight {
+          header {
+            Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE"
+            Access-Control-Max-Age "3600"
+          }
+          respond "" 204
+        }
+    }
+    {{- $name := include "dify.fullname" . }}
+    {{- $pluginManagerPort := "8084" }}
+    {{- $apiSvc := printf "http://%s-api-svc:5001" $name }}
+    {{- $webSvc := printf "http://%s-web-svc:3000" $name }}
+    {{- $socketioSvc := $apiSvc }}
+    {{- if .Values.collaboration.enabled }}
+    {{- $socketioSvc = printf "http://%s-api-websocket-svc:5001" $name }}
+    {{- end }}
+    {{- $entSvc := printf "http://%s-enterprise-svc:8082" $name }}
+    {{- $entAuditSvc := printf "http://%s-enterprise-audit-svc:8083" $name }}
+    {{- $entFrontendSvc := printf "http://%s-enterprise-frontend-svc:3000" $name }}
+    {{- $pluginDaemonSvc := printf "http://%s-plugin-daemon-svc:5002" $name }}
+    {{- $pluginManagerSvc := printf "http://%s-plugin-manager-svc:%s" $name $pluginManagerPort }}
+    {{- $rbacSvc := printf "http://%s-enterprise-rbac-svc:8086" $name }}
+
+    {
+        auto_https off
+        order dify_audit before reverse_proxy
+        order dify_credential_patcher before reverse_proxy
+        order dify_trace before reverse_proxy
+    }
+
+    {{- if and .Values.global.consoleApiDomain .Values.global.consoleWebDomain (eq .Values.global.consoleApiDomain .Values.global.consoleWebDomain) }}
+    http://{{ .Values.global.consoleApiDomain }}:3080 {
+        {{- template "dify.caddy.common_header" . }}
+        {{- template "dify.caddy.common_log" . }}
+        route {
+            dify_trace
+            {{- template "dify.caddy.audit" . }}
+
+            handle /console/api/workspaces/current/tool-provider/builtin/* {
+                {{- template "dify.caddy.credential_patcher" . }}
+                reverse_proxy {{ $apiSvc }}
+            }
+            handle /console/api/workspaces/current/model-providers* {
+                {{- template "dify.caddy.credential_patcher" . }}
+                reverse_proxy {{ $apiSvc }}
+            }
+            handle /console/api/enterprise/* {
+                reverse_proxy {{ $entSvc }}
+            }
+            handle /console/api/account/* {
+                reverse_proxy {{ $apiSvc }}
+            }
+            handle /console/api/* {
+                reverse_proxy {{ $apiSvc }}
+            }
+            {{- if .Values.api.openapi.enabled }}
+            handle /openapi/v1/* {
+                reverse_proxy {{ $apiSvc }}
+            }
+            {{- end }}
+            handle /v1/* {
+                reverse_proxy {{ $apiSvc }}
+            }
+            handle /api/enterprise/* {
+                reverse_proxy {{ $entSvc }}
+            }
+            handle /api/* {
+                reverse_proxy {{ $apiSvc }}
+            }
+            handle /e/* {
+                reverse_proxy {{ $pluginDaemonSvc }} {
+                    header_up Dify-Hook-Url {http.request.scheme}://{host}{uri}
+                }
+            }
+            handle /files/* {
+                reverse_proxy {{ $apiSvc }}
+            }
+            @socketio path /socket.io /socket.io/*
+            handle @socketio {
+                reverse_proxy {{ $socketioSvc }}
+            }
+            handle {
+                reverse_proxy {{ $webSvc }}
+            }
+            handle_path /healthz {
+                respond "OK"
+            }
+        }
+        encode zstd gzip
+        {{- template "dify.caddy.common_transport" . }}
+    }
+    {{- else }}
+    http://{{ .Values.global.consoleApiDomain }}:3080 {
+        {{- template "dify.caddy.common_header" . }}
+        {{- template "dify.caddy.common_log" . }}
+        route {
+            dify_trace
+            {{- template "dify.caddy.audit" . }}
+            handle /console/api/enterprise/* {
+                reverse_proxy {{ $entSvc }}
+            }
+            handle /console/api/account/* {
+                reverse_proxy {{ $apiSvc }}
+            }
+            handle /console/api/* {
+                reverse_proxy {{ $apiSvc }}
+            }
+            {{- if .Values.api.openapi.enabled }}
+            handle /openapi/v1/* {
+                reverse_proxy {{ $apiSvc }}
+            }
+            {{- end }}
+            handle /v1/* {
+                reverse_proxy {{ $apiSvc }}
+            }
+            handle /api/enterprise/* {
+                reverse_proxy {{ $entSvc }}
+            }
+            handle /api/* {
+                reverse_proxy {{ $apiSvc }}
+            }
+            handle /e/* {
+                reverse_proxy {{ $pluginDaemonSvc }} {
+                    header_up Dify-Hook-Url {http.request.scheme}://{host}{uri}
+                }
+            }
+            handle /files/* {
+                reverse_proxy {{ $apiSvc }}
+            }
+            @socketio path /socket.io /socket.io/*
+            handle @socketio {
+                reverse_proxy {{ $socketioSvc }}
+            }
+        }
+        encode zstd gzip
+        respond /healthz 200 {
+            body "OK"
+        }
+        {{- template "dify.caddy.common_transport" . }}
+    }
+
+    http://{{ .Values.global.consoleWebDomain }}:3080 {
+        {{- template "dify.caddy.common_header" . }}
+        route {
+            dify_trace
+            handle {
+                reverse_proxy {{ $webSvc }}
+            }
+            encode zstd gzip
+            {{- template "dify.caddy.common_transport" . }}
+        }
+    }
+    {{- end }}
+
+    http://{{ .Values.global.enterpriseDomain }}:3080 {
+        import cors {header.origin}
+        {{- template "dify.caddy.common_header" . }}
+        {{- template "dify.caddy.common_log" . }}
+        route {
+            dify_trace
+            {{- template "dify.caddy.audit" . }}
+            handle /v1/audit/* {
+                reverse_proxy {{ $entAuditSvc }}
+            }
+            {{- if .Values.enterpriseRbac.enabled }}
+            {{- template "dify.caddy.rbac_enterprise_gates" . }}
+            {{- end }}
+            handle /admin-api/* {
+                reverse_proxy {{ $entSvc }}
+            }
+            handle /scim/* {
+                reverse_proxy {{ $entSvc }}
+            }
+            handle /v1/plugin-manager/* {
+                reverse_proxy {{ $pluginManagerSvc }}
+            }
+            handle /v1/* {
+                reverse_proxy {{ $entSvc }}
+            }
+            handle /* {
+                reverse_proxy {{ $entFrontendSvc }}
+            }
+        }
+        encode zstd gzip
+        respond /healthz 200 {
+            body "OK"
+        }
+        {{- template "dify.caddy.common_transport" . }}
+    }
+
+    {{- if and .Values.global.appApiDomain .Values.global.appWebDomain (eq .Values.global.appApiDomain .Values.global.appWebDomain) }}
+    http://{{ .Values.global.appApiDomain }}:3080 {
+        {{- template "dify.caddy.common_log" . }}
+        header {
+            -Server
+            -X-Powered-By
+            -Via
+            Strict-Transport-Security "max-age=31536000;"
+        }
+        handle /api/enterprise/* {
+            dify_trace
+            reverse_proxy {{ $entSvc }}
+        }
+        handle /api/* {
+            dify_trace
+            {{- template "dify.caddy.audit" . }}
+            reverse_proxy {{ $apiSvc }}
+        }
+        handle /files/* {
+            reverse_proxy {{ $apiSvc }}
+        }
+        handle {
+            reverse_proxy {{ $webSvc }}
+        }
+    }
+    {{- else }}
+    http://{{ .Values.global.appApiDomain }}:3080 {
+        {{- template "dify.caddy.common_log" . }}
+        header {
+            -Server
+            -X-Powered-By
+            -Via
+            Strict-Transport-Security "max-age=31536000;"
+        }
+        handle /api/enterprise/* {
+            reverse_proxy {{ $entSvc }}
+        }
+        handle /api/* {
+            reverse_proxy {{ $apiSvc }}
+        }
+    }
+
+    http://{{ .Values.global.appWebDomain }}:3080 {
+        header {
+            -Server
+            -X-Powered-By
+            -Via
+            Strict-Transport-Security "max-age=31536000;"
+        }
+        handle /* {
+            reverse_proxy {{ $webSvc }}
+        }
+    }
+    {{- end }}
+
+    http://{{ .Values.global.filesDomain }}:3080 {
+        {{- template "dify.caddy.common_log" . }}
+        header {
+            -Server
+            -X-Powered-By
+            -Via
+        }
+        handle /files/* {
+            reverse_proxy {{ $apiSvc }}
+        }
+    }
+
+    http://{{ .Values.global.serviceApiDomain }}:3080 {
+        {{- template "dify.caddy.common_log" . }}
+        header {
+            -Server
+            -X-Powered-By
+            -Via
+        }
+        handle /mcp/* {
+            reverse_proxy {{ $apiSvc }}
+        }
+        handle /v1/* {
+            reverse_proxy {{ $apiSvc }}
+        }
+    }
+
+    {{- if .Values.global.triggerDomain }}
+    http://{{ .Values.global.triggerDomain }}:3080 {
+        {{- template "dify.caddy.common_log" . }}
+        {{- template "dify.caddy.common_header" . }}
+        route {
+            dify_trace
+            {{- template "dify.caddy.audit" . }}
+            handle {
+                reverse_proxy {{ $apiSvc }}
+            }
+        }
+        encode zstd gzip
+        respond /healthz 200 {
+            body "OK"
+        }
+        {{- template "dify.caddy.common_transport" . }}
+    }
+    {{- end }}
+
+    {{- if .Values.global.pluginDaemonDomain }}
+    http://{{ .Values.global.pluginDaemonDomain }}:3080 {
+        {{- template "dify.caddy.common_log" . }}
+        {{- template "dify.caddy.common_header" . }}
+        route {
+            dify_trace
+            {{- template "dify.caddy.audit" . }}
+            handle {
+                reverse_proxy {{ $pluginDaemonSvc }}
+            }
+        }
+    }
+    {{- end }}
+{{- end }}

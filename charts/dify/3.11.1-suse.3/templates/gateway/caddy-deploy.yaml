@@ -1,0 +1,115 @@
+{{- if .Values.gateway.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+{{- include "dify.labels" . | nindent 4 }}
+    app: {{ template "dify.fullname" . }}-gateway
+  name: {{ template "dify.fullname" . }}-gateway
+  namespace: {{ default "default" .Release.Namespace }}
+spec:  
+  replicas: {{ .Values.gateway.replicas }}
+  selector:
+    matchLabels:
+      app: {{ template "dify.fullname" . }}-gateway
+{{- include "dify.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/gateway/caddy-config.yaml") . | sha256sum }}
+      labels:
+{{- include "dify.selectorLabels" . | nindent 8 }}
+        app: {{ template "dify.fullname" . }}-gateway
+{{- include "dify.podExtraLabels" . | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- if include "dify.hasImagePullSecrets" . }}
+      imagePullSecrets:
+{{ include "dify.imagePullSecrets" . | nindent 8 }}
+      {{- end }}
+      {{- if include "dify.customCA.enabled" . }}
+      initContainers:
+      {{ include "dify.customCA.initContainer" . | nindent 6 }}
+      {{- end }}
+      containers:
+        - command:
+            - ./gateway
+            - run
+            - --config
+            - /app/config/Caddyfile
+          image: "{{ .Values.gateway.image.repository }}:{{ default .Chart.AppVersion .Values.gateway.image.tag }}"
+          imagePullPolicy: "IfNotPresent"
+          name: {{ template "dify.fullname" . }}-gateway
+          ports:
+            - name: api
+              protocol: TCP
+              containerPort: 3080
+            - name: https
+              protocol: TCP
+              containerPort: 3443
+          volumeMounts:
+            - mountPath: /app/config
+              name: config-volume
+            {{- if include "dify.customCA.enabled" . }}
+            {{ include "dify.customCA.volumeMount" . | nindent 12 }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.gateway.resources | nindent 12 }}
+          env:
+            - name: LOG_FORMAT
+              value: {{ .Values.global.log.outputFormat | default "json" | quote }}
+          {{- if or (include "dify.customCA.enabled" .) .Values.global.autoGenerateSecrets }}
+          envFrom:
+            {{- if .Values.global.autoGenerateSecrets }}
+            - secretRef:
+                name: {{ include "dify.runtimeCredentialsSecretName" . }}
+            {{- end }}
+            {{- if include "dify.customCA.enabled" . }}
+            - configMapRef:
+                name: {{ include "dify.customCA.configName" . }}
+            {{- end }}
+          {{- end }}
+      volumes:
+        - configMap:
+            defaultMode: 420
+            name: {{ template "dify.fullname" . }}-gateway-config
+          name: config-volume
+        {{- if include "dify.customCA.enabled" . }}
+        {{ include "dify.customCA.volume" . | nindent 8 }}
+        {{- end }}
+    {{- if .Values.gateway.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.gateway.nodeSelector | indent 8 }}
+    {{- end }}
+    {{- if .Values.gateway.affinity }}
+      affinity:
+{{ toYaml .Values.gateway.affinity | indent 8 }}
+    {{- end }}
+    {{- if .Values.gateway.tolerations }}
+      tolerations:
+{{ toYaml .Values.gateway.tolerations | indent 8 }}
+    {{- end }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "dify.fullname" . }}-gateway-svc
+  labels:
+{{ include "dify.labels" . | indent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 3080
+    - name: https
+      port: 443
+      protocol: TCP
+      targetPort: 3443
+  selector:
+{{ include "dify.selectorLabels" . | indent 4 }}
+    app: {{ template "dify.fullname" . }}-gateway
+
+{{- end }}

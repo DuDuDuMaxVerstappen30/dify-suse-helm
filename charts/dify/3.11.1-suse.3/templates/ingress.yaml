@@ -1,0 +1,63 @@
+{{- if and .Values.ingress.enabled .Values.gateway.enabled }}
+{{- $domains := list
+      .Values.global.consoleApiDomain
+      .Values.global.consoleWebDomain
+      .Values.global.serviceApiDomain
+      .Values.global.appApiDomain
+      .Values.global.appWebDomain
+      .Values.global.filesDomain
+      .Values.global.enterpriseDomain
+      .Values.global.triggerDomain
+      .Values.global.pluginDaemonDomain
+}}
+{{- $annotations := .Values.ingress.annotations | default dict }}
+{{- $otherAnnotations := omit $annotations "traefik.ingress.kubernetes.io/router.entrypoints" }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ template "dify.fullname" . }}-ingress
+  {{- if or $otherAnnotations (and (eq .Values.ingress.className "traefik") .Values.rancherUI.traefikEntryPoint) }}
+  annotations:
+    {{- if and (eq .Values.ingress.className "traefik") .Values.rancherUI.traefikEntryPoint }}
+    traefik.ingress.kubernetes.io/router.entrypoints: {{ .Values.rancherUI.traefikEntryPoint | quote }}
+    {{- end }}
+    {{- with $otherAnnotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.tls }}
+  tls:
+    {{- toYaml .Values.ingress.tls | nindent 4 }}
+  {{- else if and .Values.global.useTLS .Values.rancherUI.tlsSecretName }}
+  tls:
+    - secretName: {{ .Values.rancherUI.tlsSecretName | quote }}
+      hosts:
+        {{- $tlsSeen := dict }}
+        {{- range $host := $domains }}
+          {{- if and $host (not (hasKey $tlsSeen $host)) }}
+            {{- $_ := set $tlsSeen $host true }}
+        - {{ $host | quote }}
+          {{- end }}
+        {{- end }}
+  {{- end }}
+  ingressClassName: {{ .Values.ingress.className | quote }}
+  rules:
+    {{- $svcName := printf "%s-gateway-svc" (include "dify.fullname" .) }}
+    {{- $seen := dict }}
+    {{- range $host := $domains }}
+      {{- if and $host (not (hasKey $seen $host)) }}
+        {{- $_ := set $seen $host true }}
+    - host: {{ $host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $svcName }}
+                port:
+                  number: 80
+      {{- end }}
+    {{- end }}
+{{- end }}

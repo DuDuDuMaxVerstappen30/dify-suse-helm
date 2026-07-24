@@ -1,0 +1,150 @@
+{{- if .Values.plugin_daemon.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+{{- include "dify.labels" . | nindent 4 }}
+    app: {{ template "dify.fullname" . }}-plugin-daemon
+  name: {{ template "dify.fullname" . }}-plugin-daemon
+spec:
+  replicas: {{ .Values.plugin_daemon.replicas }}
+  selector:
+    matchLabels:
+{{- include "dify.selectorLabels" . | nindent 6 }}
+      app: {{ template "dify.fullname" . }}-plugin-daemon
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/plugin/plugin-daemon-config.yaml") . | sha256sum }}
+        checksum/shared-redis-config: {{ include (print $.Template.BasePath "/shared/redis/redis-config.yaml") . | sha256sum }}
+        checksum/shared-redis-secret: {{ include (print $.Template.BasePath "/shared/redis/redis-secret.yaml") . | sha256sum }}
+        checksum/shared-storage-config: {{ include (print $.Template.BasePath "/shared/storage/storage-config.yaml") . | sha256sum }}
+        checksum/shared-storage-secret: {{ include (print $.Template.BasePath "/shared/storage/storage-secret.yaml") . | sha256sum }}
+      labels:
+{{- include "dify.selectorLabels" . | nindent 8 }}
+        app: {{ template "dify.fullname" . }}-plugin-daemon
+{{- include "dify.podExtraLabels" . | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- if include "dify.hasImagePullSecrets" . }}
+      imagePullSecrets:
+{{ include "dify.imagePullSecrets" . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ .Values.plugin_daemon.serviceAccountName | quote }}
+      {{- if include "dify.customCA.enabled" . }}
+      initContainers:
+      {{ include "dify.customCA.initContainer" . | nindent 6 }}
+      {{- end }}
+      containers:
+      - image: "{{ .Values.plugin_daemon.image.repository }}:{{ default .Chart.AppVersion .Values.plugin_daemon.image.tag }}"
+        imagePullPolicy: "IfNotPresent"
+        name: {{ template "dify.fullname" . }}-plugin-daemon
+        {{- if .Values.plugin_daemon.extraEnv }}
+        env:
+          {{- toYaml .Values.plugin_daemon.extraEnv | nindent 10 }}
+        {{- end }}
+        envFrom:
+          - configMapRef:
+              name: {{ template "dify.fullname" . }}-shared-redis-config
+          - secretRef:
+              name: {{ template "dify.fullname" . }}-shared-redis-secret
+          - configMapRef:
+              name: {{ template "dify.fullname" . }}-shared-storage-config
+          - secretRef:
+              name: {{ template "dify.fullname" . }}-shared-storage-secret
+          - configMapRef:
+              name: {{ template "dify.fullname" . }}-plugin-daemon-config
+          - secretRef:
+              name: {{ template "dify.fullname" . }}-plugin-daemon-secret
+          {{- if include "dify.customCA.enabled" . }}
+          - configMapRef:
+              name: {{ include "dify.customCA.configName" . }}
+          {{- end }}
+          {{- if .Values.global.autoGenerateSecrets }}
+          - secretRef:
+              name: {{ include "dify.runtimeCredentialsSecretName" . }}
+          {{- end }}
+        ports:
+          - name: inner-api
+            containerPort: 5002
+            protocol: TCP
+          - name: debugger
+            containerPort: 5003
+            protocol: TCP
+        resources:
+          {{- toYaml .Values.plugin_daemon.resources | nindent 12 }}
+        {{- if or (eq .Values.persistence.type "local") (include "dify.customCA.enabled" .) }}
+        volumeMounts:
+        {{- if eq .Values.persistence.type "local" }}
+        - name: app-data
+          mountPath: {{ .Values.persistence.local.mountPath | quote }}
+          subPath: "plugin-daemon"
+        {{- end }}
+        {{- if include "dify.customCA.enabled" . }}
+        {{ include "dify.customCA.volumeMount" . | nindent 8 }}
+        {{- end }}
+        {{- end }}
+    {{- if .Values.plugin_daemon.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.plugin_daemon.nodeSelector | indent 8 }}
+    {{- end }}
+    {{- if .Values.plugin_daemon.affinity }}
+      affinity:
+{{ toYaml .Values.plugin_daemon.affinity | indent 8 }}
+    {{- end }}
+    {{- if .Values.plugin_daemon.tolerations }}
+      tolerations:
+{{ toYaml .Values.plugin_daemon.tolerations | indent 8 }}
+    {{- end }}
+      {{- if or (eq .Values.persistence.type "local") (include "dify.customCA.enabled" .) }}
+      volumes:
+      {{- if eq .Values.persistence.type "local" }}
+      - name: app-data
+        persistentVolumeClaim:
+        {{- if not .Values.persistence.local.persistentVolumeClaim.existingClaim }}
+          claimName: {{ template "dify.fullname" . }}-backend-pvc
+        {{- else }}
+          claimName: {{ .Values.persistence.local.persistentVolumeClaim.existingClaim }}
+        {{- end }}
+      {{- end }}
+      {{- if include "dify.customCA.enabled" . }}
+      {{ include "dify.customCA.volume" . | nindent 6 }}
+      {{- end }}
+      {{- end }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "dify.fullname" . }}-plugin-daemon-svc
+  labels:
+{{ include "dify.labels" . | indent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: api
+      port: 5002
+      protocol: TCP
+      targetPort: 5002
+  selector:
+{{ include "dify.selectorLabels" . | indent 4 }}
+    app: {{ template "dify.fullname" . }}-plugin-daemon
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "dify.fullname" . }}-plugin-daemon-debug-svc
+  labels:
+{{ include "dify.labels" . | indent 4 }}
+spec:
+  type: {{ .Values.plugin_daemon.serviceType }}
+  ports:
+    - name: debug
+      port: 5003
+      protocol: TCP
+      targetPort: 5003
+  selector:
+{{ include "dify.selectorLabels" . | indent 4 }}
+    app: {{ template "dify.fullname" . }}-plugin-daemon
+
+{{- end }}

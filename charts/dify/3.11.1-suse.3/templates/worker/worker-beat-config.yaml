@@ -1,0 +1,19 @@
+{{- if .Values.workerBeat.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "dify.fullname" . }}-worker-beat-config
+data:
+  EDITION: {{ .Values.global.edition | quote }}
+  MODE: "beat"
+  LOG_LEVEL: "INFO"
+  LOG_OUTPUT_FORMAT: {{ .Values.global.log.outputFormat | default "json" | quote }}
+  MIGRATION_ENABLED: "false"
+  MARKETPLACE_ENABLED: {{ .Values.global.marketplace.enabled | toString | quote }}
+  MARKETPLACE_API_URL: {{ .Values.global.marketplace.apiUrl | quote }}
+  SQLALCHEMY_POOL_SIZE: {{ .Values.workerBeat.db.poolSize | quote }}
+  SQLALCHEMY_POOL_RECYCLE: {{ .Values.workerBeat.db.poolRecycle | quote }}
+  WORKFLOW_LOG_CLEANUP_ENABLED: {{ .Values.workerBeat.enableWorkflowLogCleanup | toString | quote }}
+
+  {{- include "dify.otel.config" . | nindent 2 }}
+{{- end }}

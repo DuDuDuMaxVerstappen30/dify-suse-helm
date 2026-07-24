@@ -1,0 +1,141 @@
+{{- if .Values.workerBeat.enabled}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+{{- include "dify.labels" . | nindent 4 }}
+    app: {{ template "dify.fullname" . }}-worker-beat
+  name: {{ template "dify.fullname" . }}-worker-beat
+spec:
+  ## Replicas should be set to 1 for worker beat deployment
+  # This is to ensure that only one worker beat is running at a time.
+  replicas: 1
+  selector:
+    matchLabels:
+{{- include "dify.selectorLabels" . | nindent 6 }}
+      app: {{ template "dify.fullname" . }}-worker-beat
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/worker/worker-beat-config.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/worker/worker-beat-secret.yaml") . | sha256sum }}
+        checksum/shared-celery-secret: {{ include (print $.Template.BasePath "/shared/celery/celery-secret.yaml") . | sha256sum }}
+        checksum/shared-db-config: {{ include (print $.Template.BasePath "/shared/db/db-config.yaml") . | sha256sum }}
+        checksum/shared-db-secret: {{ include (print $.Template.BasePath "/shared/db/db-secret.yaml") . | sha256sum }}
+        checksum/shared-redis-config: {{ include (print $.Template.BasePath "/shared/redis/redis-config.yaml") . | sha256sum }}
+        checksum/shared-redis-secret: {{ include (print $.Template.BasePath "/shared/redis/redis-secret.yaml") . | sha256sum }}
+        checksum/shared-vectordb-config: {{ include (print $.Template.BasePath "/shared/vectordb/vectordb-config.yaml") . | sha256sum }}
+        checksum/shared-vectordb-secret: {{ include (print $.Template.BasePath "/shared/vectordb/vectordb-secret.yaml") . | sha256sum }}
+        checksum/shared-storage-config: {{ include (print $.Template.BasePath "/shared/storage/storage-config.yaml") . | sha256sum }}
+        checksum/shared-storage-secret: {{ include (print $.Template.BasePath "/shared/storage/storage-secret.yaml") . | sha256sum }}
+        checksum/shared-mail-config: {{ include (print $.Template.BasePath "/shared/mail/mail-config.yaml") . | sha256sum }}
+        checksum/shared-mail-secret: {{ include (print $.Template.BasePath "/shared/mail/mail-secret.yaml") . | sha256sum }}
+      labels:
+{{- include "dify.selectorLabels" . | nindent 8 }}
+        app: {{ template "dify.fullname" . }}-worker-beat
+{{- include "dify.podExtraLabels" . | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- if include "dify.hasImagePullSecrets" . }}
+      imagePullSecrets:
+{{ include "dify.imagePullSecrets" . | nindent 8 }}
+      {{- end }}
+      {{- if include "dify.customCA.enabled" . }}
+      initContainers:
+      {{ include "dify.customCA.initContainer" . | nindent 6 }}
+      {{- end }}
+      containers:
+      - image: "{{ .Values.workerBeat.image.repository }}:{{ default .Chart.AppVersion .Values.workerBeat.image.tag }}"
+        imagePullPolicy: "IfNotPresent"
+        name: {{ template "dify.fullname" . }}-worker-beat
+        {{- if .Values.workerBeat.extraEnv }}
+        env:
+          {{- toYaml .Values.workerBeat.extraEnv | nindent 8 }}
+        {{- end }}
+        envFrom:
+          - configMapRef:
+              name: {{ template "dify.fullname" . }}-worker-beat-config
+          - secretRef:
+              name: {{ template "dify.fullname" . }}-worker-beat-secret
+          - secretRef:
+              name: {{ template "dify.fullname" . }}-shared-celery-secret
+          - configMapRef:
+              name: {{ template "dify.fullname" . }}-shared-db-config
+          - secretRef:
+              name: {{ template "dify.fullname" . }}-shared-db-secret
+          - configMapRef:
+              name: {{ template "dify.fullname" . }}-shared-redis-config
+          - secretRef:
+              name: {{ template "dify.fullname" . }}-shared-redis-secret
+          - configMapRef:
+              name: {{ template "dify.fullname" . }}-shared-vectordb-config
+          - secretRef:
+              name: {{ template "dify.fullname" . }}-shared-vectordb-secret
+          - configMapRef:
+              name: {{ template "dify.fullname" . }}-shared-storage-config
+          - secretRef:
+              name: {{ template "dify.fullname" . }}-shared-storage-secret
+          - configMapRef:
+              name: {{ template "dify.fullname" . }}-shared-mail-config
+          - secretRef:
+              name: {{ template "dify.fullname" . }}-shared-mail-secret
+          {{- if include "dify.customCA.enabled" . }}
+          - configMapRef:
+              name: {{ include "dify.customCA.configName" . }}
+          {{- end }}
+          {{- if .Values.global.autoGenerateSecrets }}
+          - secretRef:
+              name: {{ include "dify.runtimeCredentialsSecretName" . }}
+          {{- end }}
+        {{- if .Values.workerBeat.readinessProbe }}
+        readinessProbe:
+          {{- toYaml .Values.workerBeat.readinessProbe | nindent 12 }}
+        {{- end }}
+        {{- if .Values.workerBeat.livenessProbe }}
+        livenessProbe:
+          {{- toYaml .Values.workerBeat.livenessProbe | nindent 12 }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.workerBeat.resources | nindent 12 }}
+        {{- if or (eq .Values.persistence.type "local") (include "dify.customCA.enabled" .) }}
+        volumeMounts:
+        {{- if eq .Values.persistence.type "local" }}
+        - name: app-data
+          mountPath: {{ .Values.persistence.local.mountPath | quote }}
+          subPath: ""
+        {{- end }}
+        {{- if include "dify.customCA.enabled" . }}
+        {{ include "dify.customCA.volumeMount" . | nindent 8 }}
+        {{- end }}
+        {{- end }}
+    {{- if .Values.workerBeat.serviceAccountName }}
+      serviceAccountName: {{ .Values.workerBeat.serviceAccountName | quote }}
+    {{- end }}
+    {{- if .Values.workerBeat.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.workerBeat.nodeSelector | indent 8 }}
+    {{- end }}
+    {{- if .Values.workerBeat.affinity }}
+      affinity:
+{{ toYaml .Values.workerBeat.affinity | indent 8 }}
+    {{- end }}
+    {{- if .Values.workerBeat.tolerations }}
+      tolerations:
+{{ toYaml .Values.workerBeat.tolerations | indent 8 }}
+    {{- end }}
+      {{- if or (eq .Values.persistence.type "local") (include "dify.customCA.enabled" .) }}
+      volumes:
+      {{- if eq .Values.persistence.type "local" }}
+      - name: app-data
+        persistentVolumeClaim:
+        {{- if not .Values.persistence.local.persistentVolumeClaim.existingClaim }}
+          claimName: {{ template "dify.fullname" . }}-backend-pvc
+        {{- else }}
+          claimName: {{ .Values.persistence.local.persistentVolumeClaim.existingClaim }}
+        {{- end }}
+      {{- end }}
+      {{- if include "dify.customCA.enabled" . }}
+      {{ include "dify.customCA.volume" . | nindent 6 }}
+      {{- end }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,29 @@
+{{- if .Values.web.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "dify.fullname" . }}-web-config
+data:
+  EDITION: {{ .Values.global.edition | quote }}
+  CONSOLE_API_URL: {{ include "dify.externalUrl" (dict "domain" .Values.global.consoleApiDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) | quote }}
+  SERVER_CONSOLE_API_URL: {{ .Values.web.serverConsoleApiUrl | default (printf "http://%s-api-svc:5001" (include "dify.fullname" .)) | quote }}
+  APP_API_URL: {{ include "dify.externalUrl" (dict "domain" .Values.global.appApiDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) | quote }}
+  TOP_K_MAX_VALUE: {{ .Values.global.rag.topKMaxValue | quote }}
+  INDEXING_MAX_SEGMENTATION_TOKENS_LENGTH: {{ .Values.global.rag.indexingMaxSegmentationTokensLength | quote }}
+  MARKETPLACE_URL: {{ .Values.global.marketplace.url | quote }}
+  MARKETPLACE_API_URL: {{ .Values.global.marketplace.apiUrl | quote }}
+  # web entrypoint derives the NEXT_PUBLIC_* collaboration flag from this
+  ENABLE_COLLABORATION_MODE: {{ .Values.collaboration.enabled | toString | quote }}
+  {{- if .Values.collaboration.enabled }}
+  NEXT_PUBLIC_SOCKET_URL: {{ include "dify.externalWsUrl" (dict "domain" .Values.global.consoleApiDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) | quote }}
+  {{- end }}
+  {{- if .Values.web.sentry.enabled }}
+  # The DSN for Sentry error reporting. If not set, Sentry error reporting will be disabled.
+  SENTRY_DSN: {{ .Values.web.sentry.dsn | quote }}
+  # The sample rate for Sentry events. Default: `1.0`
+  SENTRY_TRACES_SAMPLE_RATE: {{ .Values.web.sentry.tracesSampleRate | quote }}
+  # The sample rate for Sentry profiles. Default: `1.0`
+  SENTRY_PROFILES_SAMPLE_RATE: {{ .Values.web.sentry.profilesSampleRate | quote }}
+  SITE_ABOUT: "hide"
+  {{- end }}
+{{- end }}
