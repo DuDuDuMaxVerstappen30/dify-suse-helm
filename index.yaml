@@ -5,7 +5,7 @@ entries:
       appVersion: 3.11.1
       created: "2026-07-24T00:00:00+08:00"
       description: Dify Enterprise 3.11.1 with guided SUSE Rancher installation forms
-      digest: 140a7c41f36a5d859e6ffb97ba8a37f02e74098acf524252cce4db48ce797474
+      digest: b35e5b8cd529b16646a411ebed71f541027bb70ffb986bb1f0cd1bc34e6b5373
       home: https://dify.ai
       icon: https://avatars.githubusercontent.com/u/127165244
       keywords:
