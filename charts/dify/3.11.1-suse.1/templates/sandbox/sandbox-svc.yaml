@@ -1,0 +1,18 @@
+{{- if .Values.sandbox.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "dify.fullname" . }}-sandbox-svc
+  labels:
+{{ include "dify.labels" . | indent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: sandbox
+      port: 8194
+      protocol: TCP
+      targetPort: 8194
+  selector:
+{{ include "dify.selectorLabels" . | indent 4 }}
+    app: {{ template "dify.fullname" . }}-sandbox
+{{- end }}

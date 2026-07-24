@@ -1,0 +1,53 @@
+apiVersion: v2
+appVersion: 3.11.1
+annotations:
+  catalog.cattle.io/display-name: Dify Enterprise 3.11.1 SUSE Update 1
+  catalog.cattle.io/os: linux
+dependencies:
+- condition: postgresql.enabled
+  name: postgresql
+  repository: https://charts.bitnami.com/bitnami
+  tags:
+  - postgres
+  version: 12.5.6
+- condition: redis.enabled
+  name: redis
+  repository: https://charts.bitnami.com/bitnami
+  tags:
+  - redis
+  version: 16.13.2
+- condition: weaviate.enabled
+  name: weaviate
+  repository: https://weaviate.github.io/weaviate-helm
+  tags:
+  - vector
+  - search
+  version: 16.1.0
+- condition: qdrant.enabled
+  name: qdrant
+  repository: https://qdrant.github.io/qdrant-helm
+  tags:
+  - vector
+  - search
+  version: 0.8.5
+description: Dify Enterprise 3.11.1 with guided SUSE Rancher installation forms
+home: https://dify.ai
+icon: https://avatars.githubusercontent.com/u/127165244
+keywords:
+- dify
+- langgenius
+- llm
+- ai
+- enterprise
+- rancher
+maintainers:
+- email: yeuoly@dify.ai
+  name: Yeuoly
+- email: takatost@dify.ai
+  name: takatost
+name: dify
+sources:
+- https://github.com/langgenius/dify
+- https://github.com/langgenius/dify-helm
+type: application
+version: 3.11.1-suse.1

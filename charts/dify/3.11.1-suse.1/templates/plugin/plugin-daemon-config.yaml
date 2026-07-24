@@ -1,0 +1,138 @@
+{{- if .Values.plugin_daemon.enabled }}
+{{- $datasource := include "dify.pluginDaemonDatasource" . | fromJson }}
+{{- $pluginDbUser := include "dify.dbCredentialUser" (dict "Values" .Values "credentialKey" "plugin_daemon") }}
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "dify.fullname" . }}-plugin-daemon-config
+data:
+  DB_TYPE: {{ $datasource.db_type | quote }}
+  DB_HOST: {{ $datasource.host | quote }}
+  DB_PORT: {{ $datasource.port | quote }}
+  DB_USERNAME: {{ ($pluginDbUser | default $datasource.user) | quote }}
+  DB_DATABASE: {{ $datasource.db_name | quote }}
+  DB_DEFAULT_DATABASE: {{ $datasource.db_default | quote }}
+  DB_SSL_MODE: {{ $datasource.ssl_mode | quote }}
+  DB_EXTRAS: {{ $datasource.db_extras | quote }}
+  DB_CHARSET: {{ $datasource.db_charset | quote }}
+  DIFY_INNER_API_URL: http://{{ template "dify.fullname" . }}-api-svc:5001
+  DIFY_PLUGIN_SERVERLESS_CONNECTOR_URL: http://{{ template "dify.fullname" . }}-plugin-connector-svc.{{ include "dify.pluginRuntimeNamespace" . }}
+  DISPLAY_CLUSTER_LOG: 'true'
+  FORCE_VERIFYING_SIGNATURE: {{ .Values.plugin_daemon.forceVerifyingSignature | quote }}
+  GIN_MODE: release
+  MAX_AWS_LAMBDA_TRANSACTION_TIMEOUT: {{ .Values.plugin_daemon.pluginExecuteTimeout | quote }}
+  {{- if eq .Values.persistence.type "local" }}
+  PERSISTENCE_STORAGE_LOCAL_PATH: {{ .Values.persistence.local.mountPath }}/plugin-daemon/persistence
+  PLUGIN_MEDIA_CACHE_PATH: {{ .Values.persistence.local.mountPath }}/plugin-daemon/assets
+  PLUGIN_PACKAGE_CACHE_PATH: {{ .Values.persistence.local.mountPath }}/plugin-daemon/plugin_packages
+  PLUGIN_STORAGE_LOCAL_ROOT: {{ .Values.persistence.local.mountPath }}/plugin-daemon
+  PLUGIN_WORKING_PATH: {{ .Values.persistence.local.mountPath }}/plugin-daemon/plugin_working
+  STORAGE_PLUGIN_PATH: {{ .Values.persistence.local.mountPath }}/plugin-daemon/plugin
+  {{- else }}
+  PERSISTENCE_STORAGE_LOCAL_PATH: persistence
+  PLUGIN_MEDIA_CACHE_PATH: assets
+  PLUGIN_PACKAGE_CACHE_PATH: plugin_packages
+  PLUGIN_STORAGE_LOCAL_ROOT: storage
+  PLUGIN_WORKING_PATH: plugin_working
+  STORAGE_PLUGIN_PATH: ./plugin
+  {{- end }}
+  PLATFORM: serverless
+  PLUGIN_MAX_EXECUTION_TIMEOUT: {{ .Values.plugin_daemon.pluginExecuteTimeout | quote }}
+  PLUGIN_REMOTE_INSTALLING_ENABLED: 'true'
+  PLUGIN_REMOTE_INSTALLING_HOST: 0.0.0.0
+  PLUGIN_REMOTE_INSTALLING_MAX_CONN: '128'
+  PLUGIN_REMOTE_INSTALLING_PORT: '5003'
+
+  {{- $bucketName := "" }}
+  {{- with .Values.persistence }}
+    {{- if eq .type "s3" }}
+      {{- $bucketName = .s3.bucketName }}
+    {{- else if eq .type "azure-blob" }}
+      {{- $bucketName = .azureBlob.bucketName }}
+    {{- else if eq .type "aliyun-oss"}}
+      {{- $bucketName = .aliyunOss.bucketName }}
+    {{- else if eq .type "google-storage"}}
+      {{- $bucketName = .googleStorage.bucketName }}
+    {{- else if eq .type "tencent-cos"}}
+      {{- $bucketName = .tencentCos.bucketName }}
+    {{- else if eq .type "volcengine-tos"}}
+      {{- $bucketName = .volcengineTos.bucketName }}
+    {{- else if eq .type "huawei-obs"}}
+      {{- $bucketName = .huaweiObs.bucketName }}
+    {{- end }}
+  {{- end }}
+
+  PLUGIN_STORAGE_OSS_BUCKET: "{{ $bucketName }}"
+  PLUGIN_STORAGE_TYPE: {{ .Values.persistence.type | quote }}
+  PPROF_ENABLED: 'true'
+  ROUTINE_POOL_SIZE: '10240'
+  SERVER_PORT: '5002'
+  DIFY_PLUGIN_SERVERLESS_CONNECTOR_LAUNCH_TIMEOUT: '{{ .Values.plugin_daemon.maxLaunchSeconds }}'
+  
+  AWS_REGION: {{ .Values.persistence.s3.region | quote }}
+  S3_USE_PATH_STYLE: "true"
+  S3_USE_AWS_MANAGED_IAM: {{ .Values.persistence.s3.useAwsManagedIam | quote }}
+  S3_USE_AWS: {{ .Values.persistence.s3.useAwsS3 | quote }}
+
+  TENCENT_COS_REGION: {{ .Values.persistence.tencentCos.region | quote }}
+
+  ALIYUN_OSS_REGION: {{ .Values.persistence.aliyunOss.region | quote }}
+  ALIYUN_OSS_ENDPOINT: {{ .Values.persistence.aliyunOss.endpoint | quote }}
+  ALIYUN_OSS_AUTH_VERSION: "v4"
+  ALIYUN_OSS_PATH: "/"
+
+  AZURE_BLOB_STORAGE_CONTAINER_NAME: {{ .Values.persistence.azureBlob.containerName | quote }}
+
+  VOLCENGINE_TOS_ENDPOINT:  {{ .Values.persistence.volcengineTos.endpoint | quote}}
+  VOLCENGINE_TOS_REGION: {{ .Values.persistence.volcengineTos.region | quote}}
+
+  HUAWEI_OBS_SERVER: {{ .Values.persistence.huaweiObs.server | quote }}
+  PLUGIN_ALLOW_ORPHANS: 'true'
+  LOG_OUTPUT_FORMAT: {{ .Values.global.log.outputFormat | default "json" | quote }}
+  {{- include "dify.otel.config" . | nindent 2 }}
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ template "dify.fullname" . }}-plugin-daemon-secret
+type: Opaque
+{{- $pluginDbPass := include "dify.dbCredentialPassword" (dict "Values" .Values "credentialKey" "plugin_daemon") }}
+stringData:
+  DB_PASSWORD: {{ ($pluginDbPass | default $datasource.password) | quote }}
+  DIFY_PLUGIN_SERVERLESS_CONNECTOR_API_KEY: {{ .Values.global.innerApiKey | quote }}
+  DIFY_INNER_API_KEY: {{ .Values.global.innerApiKey | quote }}
+  SERVER_KEY: {{ .Values.global.innerApiKey | quote }}
+
+  {{- if and (eq .Values.persistence.type "s3") (not .Values.persistence.s3.useAwsManagedIam) }}
+  AWS_ACCESS_KEY: {{ .Values.persistence.s3.accessKey | quote }}
+  AWS_SECRET_KEY: {{ .Values.persistence.s3.secretKey | quote }}
+  {{- end }}
+
+  TENCENT_COS_SECRET_ID: {{ .Values.persistence.tencentCos.secretId | quote }}
+  TENCENT_COS_SECRET_KEY: {{ .Values.persistence.tencentCos.secretKey | quote }}
+
+
+  AZURE_BLOB_STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=https;AccountName={{ .Values.persistence.azureBlob.accountName }};AccountKey={{ .Values.persistence.azureBlob.accountKey }}{{- if .Values.persistence.azureBlob.endpointSuffix }};EndpointSuffix={{ .Values.persistence.azureBlob.endpointSuffix }}{{- end }}"
+  AZURE_BLOB_STORAGE_USE_MANAGED_IDENTITY: {{ .Values.persistence.azureBlob.useManagedIdentity | quote }}
+  AZURE_BLOB_STORAGE_ACCOUNT_URL: {{ .Values.persistence.azureBlob.accountUrl | quote }}
+  AZURE_BLOB_STORAGE_CONTAINER_NAME: {{ .Values.persistence.azureBlob.containerName | quote }}
+
+  ALIYUN_OSS_ACCESS_KEY_ID: {{ .Values.persistence.aliyunOss.accessKey | quote }}
+  ALIYUN_OSS_ACCESS_KEY_SECRET: {{ .Values.persistence.aliyunOss.secretKey | quote }}
+
+  VOLCENGINE_TOS_ACCESS_KEY: {{ .Values.persistence.volcengineTos.accessKey | quote }}
+  VOLCENGINE_TOS_SECRET_KEY: {{ .Values.persistence.volcengineTos.secretKey | quote }}
+
+  GCS_CREDENTIALS: {{ .Values.persistence.googleStorage.serviceAccountJson | quote }}
+
+  HUAWEI_OBS_ACCESS_KEY: {{ .Values.persistence.huaweiObs.accessKey | quote }}
+  HUAWEI_OBS_SECRET_KEY: {{ .Values.persistence.huaweiObs.secretKey | quote }}
+  ADMIN_API_ENABLED: {{ .Values.plugin_daemon.adminApiEnabled | quote }}
+  # use same api key for now.
+  ADMIN_API_KEY: {{ .Values.global.innerApiKey | quote }}
+  {{- if and .Values.global.otel.enabled .Values.enterpriseCollector.enabled }}
+  OTEL_API_KEY: {{ .Values.global.innerApiKey | quote }}
+  {{- end }}
+{{- end }}

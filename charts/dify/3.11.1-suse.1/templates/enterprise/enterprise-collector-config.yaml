@@ -1,0 +1,40 @@
+{{- $dbInstance := include "dify.dbInstance" . | fromJson }}
+{{- $enterpriseDbName := include "dify.dbName" (dict "Values" .Values "credentialKey" "enterprise") }}
+
+{{- if .Values.enterpriseCollector.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "dify.fullname" . }}-enterprise-collector-config
+data:
+  # Database configuration for enterprise database
+  DB_ENGINE: {{ $dbInstance.engine | quote }}
+  DB_HOST: {{ $dbInstance.host | quote }}
+  DB_PORT: {{ $dbInstance.port | toString | quote }}
+  DB_TZ: {{ $dbInstance.timezone | quote }}
+  DB_SSL_MODE: {{ $dbInstance.pg_ssl_mode | quote }}
+  DB_URI_SCHEME: {{ $dbInstance.pg_uri_scheme | quote }}
+  DB_EXTRAS: {{ $dbInstance.pg_extras | toString | quote }}
+  DB_PARAMS: {{ $dbInstance.mysql_params | quote }}
+  DB_TLS: {{ $dbInstance.mysql_tls | toString | quote }}
+  ENTERPRISE_DB_NAME: {{ $enterpriseDbName | quote }}
+  ENTERPRISE_DB_USER: {{ (include "dify.dbCredentialUser" (dict "Values" .Values "credentialKey" "enterprise") | default $dbInstance.user) | quote }}
+  TRACE_SENDING_QUEUE_SIZE: {{ .Values.enterpriseCollector.sendingQueues.trace.size | default 64 | quote }}
+  METRIC_SENDING_QUEUE_SIZE: {{ .Values.enterpriseCollector.sendingQueues.metric.size | default 256 | quote }}
+  
+  # Redis DSN
+  REDIS_DSN: {{ include "dify.redis.dsn" . | replace "\n" "" | quote }}
+  
+  # Log configuration
+  LOG_FORMAT: {{ .Values.global.log.outputFormat | default "json" | quote }}
+{{- end }}
+---
+{{- if .Values.enterpriseCollector.extraConfig }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "dify.fullname" . }}-enterprise-collector-extra-config
+data:
+  config.yaml: |
+{{- .Values.enterpriseCollector.extraConfig | nindent 4 }}
+{{- end }}

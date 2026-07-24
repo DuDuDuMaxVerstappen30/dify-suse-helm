@@ -1,0 +1,153 @@
+{{- $dbInstance := include "dify.dbInstance" . | fromJson }}
+{{- $enterpriseDbName := include "dify.dbName" (dict "Values" .Values "credentialKey" "enterprise") }}
+{{- $pluginDbName := include "dify.dbName" (dict "Values" .Values "credentialKey" "plugin_daemon") }}
+{{- if .Values.plugin_daemon.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "dify.fullname" . }}-plugin-connector-config
+  namespace: {{ include "dify.pluginRuntimeNamespace" . }}
+data:
+  config.yaml: |
+    pluginScheduleInfo:
+      labels:
+{{- if .Values.plugin_connector.labels }}
+{{ toYaml .Values.plugin_connector.labels | nindent 8 }}
+{{- end}}
+      nodeSelector:
+{{- if .Values.plugin_connector.nodeSelector }}
+{{ toYaml .Values.plugin_connector.nodeSelector | nindent 8 }}
+{{- end}}
+{{- if .Values.plugin_connector.affinity }}
+      affinity: {{ .Values.plugin_connector.affinity | toYaml | b64enc }}
+{{- end}}
+{{- if .Values.plugin_connector.tolerations }}
+      tolerations: {{ .Values.plugin_connector.tolerations | toYaml | b64enc }}
+{{- end}}
+      requests:
+        cpu: {{ .Values.plugin_connector.pluginResourceRequests.cpu | quote }}
+        memory: {{ .Values.plugin_connector.pluginResourceRequests.memory | quote }}
+        ephemeralStorage: {{ .Values.plugin_connector.pluginResourceRequests.ephemeralStorage | quote }}
+      limits:
+        cpu: {{ .Values.plugin_connector.pluginResourceLimits.cpu | quote }}
+        memory: {{ .Values.plugin_connector.pluginResourceLimits.memory | quote }}
+        ephemeralStorage: {{ .Values.plugin_connector.pluginResourceLimits.ephemeralStorage | quote }}
+    namespace: {{ include "dify.pluginRuntimeNamespace" . | quote }}
+    customServiceAccount: {{ .Values.plugin_connector.customServiceAccount | quote }}
+    runnerServiceAccount: {{ .Values.plugin_connector.runnerServiceAccount | quote }}
+    server:
+      serverPort: 5004
+      apiKey: {{ .Values.global.innerApiKey | quote }}
+      maxWaitSeconds: {{ .Values.plugin_connector.maxWaitSeconds }}
+    data:
+      db_instance:
+        engine: ${DB_ENGINE:{{ $dbInstance.engine }}}
+        host: ${DB_HOST:{{ $dbInstance.host }}}
+        port: ${DB_PORT:{{ $dbInstance.port }}}
+        timezone: ${DB_TZ:{{ $dbInstance.timezone }}}
+        dialect_options:
+          postgres:
+            ssl_mode: ${DB_SSL_MODE:{{ $dbInstance.pg_ssl_mode }}}
+            uri_scheme: ${DB_URI_SCHEME:{{ $dbInstance.pg_uri_scheme }}}
+            extras: ${DB_EXTRAS:"{{ $dbInstance.pg_extras }}"}
+          mysql:
+            params: ${DB_PARAMS:"{{ $dbInstance.mysql_params }}"}
+            tls: ${DB_TLS:{{ $dbInstance.mysql_tls }}}
+      enterprise_db:
+        name: ${ENTERPRISE_DB_NAME:{{ $enterpriseDbName }}}
+        user: ${ENTERPRISE_DB_USER:}
+        password: ${ENTERPRISE_DB_PASS:}
+      plugin_db:
+        name: ${PLUGIN_DB_NAME:{{ $pluginDbName }}}
+        user: ${PLUGIN_DB_USER:}
+        password: ${PLUGIN_DB_PASS:}
+    builder:
+      {{- $builderName := default "kaniko" .Values.plugin_connector.builderName }}
+      maxDockerContextSize: 52428800
+      builderName: {{ $builderName | quote }}
+      secret: {{ .Values.plugin_connector.imageRepoSecret }}
+      repoType: {{ .Values.plugin_connector.imageRepoType | quote }}
+      insecureRepo: {{ .Values.plugin_connector.insecureImageRepo }}
+      kaniko:
+        shaderImage: {{ .Values.plugin_connector.shaderImage | quote }}
+        imagePrefix: {{ .Values.plugin_connector.imageRepoPrefix | quote }}
+        ecr_region: {{ .Values.plugin_connector.ecrRegion | quote }}
+        use_aws_iam: {{ .Values.persistence.s3.useAwsManagedIam | default false }}
+        awsCliImage: {{ .Values.plugin_connector.awsCliImage | quote }}
+      github:
+        repoName: {{ .Values.plugin_connector.github.repoName | default "" | quote }}
+        actionFileName: {{ .Values.plugin_connector.github.actionFileName | default "" | quote }}
+        branch: {{ .Values.plugin_connector.github.branch | default "" | quote }}
+        imagePrefix: {{ .Values.plugin_connector.github.imagePrefix | default .Values.plugin_connector.imageRepoPrefix | default "" | quote }}
+        orgName: {{ .Values.plugin_connector.github.orgName | default "" | quote }}
+        shaderImage: {{ .Values.plugin_connector.shaderImage | quote }}
+        authMethod: {{ .Values.plugin_connector.github.authMethod | default "" | quote }}
+        githubAccessToken: {{ .Values.plugin_connector.github.accessToken | quote }}
+        {{- with .Values.plugin_connector.github.app }}
+        app:
+          appId: {{ .appId | quote }}
+          installationId: {{ .installationId | quote }}
+          privateKeyFile: {{ printf "/app/github/%s" (.privateKeySecretKey | default "app.pem") | quote }}
+        {{- end }}
+      httpProxy: {{ .Values.plugin_connector.httpProxy | default "" | quote }}
+    storage:
+      remoteS3:
+      {{- if eq .Values.persistence.type "s3" }}
+        region: {{ .Values.persistence.s3.region | quote }}
+        accessKey: ${S3_ACCESS_KEY}
+        secretKey: ${S3_SECRET_KEY}
+        endpoint:  {{ .Values.persistence.s3.endpoint | quote }}
+        bucket: {{ .Values.persistence.s3.bucketName | quote }}
+        useAws: {{ .Values.persistence.s3.useAwsS3 }}
+        useIam: {{ .Values.persistence.s3.useAwsManagedIam }}
+      {{- else }}
+        region: ""
+        accessKey: ""
+        secretKey: ""
+        endpoint: ""
+        bucket: ""
+        useAws: false
+        useIam: false
+      {{- end }}
+      localS3:
+      {{- if eq .Values.persistence.type "s3" }}
+        region: {{ .Values.persistence.s3.region | quote }}
+        accessKey: ${S3_ACCESS_KEY}
+        secretKey: ${S3_SECRET_KEY}
+        endpoint:  {{ .Values.persistence.s3.endpoint | quote }}
+        bucket: {{ .Values.persistence.s3.bucketName | quote }}
+        useAws: {{ .Values.persistence.s3.useAwsS3 }}
+        useIam: {{ .Values.persistence.s3.useAwsManagedIam }}
+      {{- else }}
+        region: "us-east-1"
+        accessKey: ${S3_ACCESS_KEY}
+        secretKey: ${S3_SECRET_KEY}
+        endpoint: http://{{ template "dify.fullname" .}}-enterprise-svc.{{ .Release.Namespace }}:8082/oss
+        bucket: dify-plugin
+        useAws: false
+        useIam: false
+      {{- end }}
+    pluginDr:
+      enabled: {{ .Values.global.pluginDr.enabled | default false }}
+      reconcileInterval: {{ .Values.plugin_connector.pluginDr.reconcileInterval | default "5s" | quote }}
+      reconcileBatchSize: {{ .Values.plugin_connector.pluginDr.reconcileBatchSize | default 100 }}
+      fullReconcileInterval: {{ .Values.plugin_connector.pluginDr.fullReconcileInterval | default "1800s" | quote }}
+      gcInterval: {{ .Values.plugin_connector.pluginDr.gcInterval | default "300s" | quote }}
+      deadLetterThreshold: {{ .Values.plugin_connector.pluginDr.deadLetterThreshold | default 5 }}
+      softDeleteRetention: {{ .Values.plugin_connector.pluginDr.softDeleteRetention | default "86400s" | quote }}
+    runner:
+      gatewayImage: {{ .Values.plugin_connector.gatewayImage | quote }}
+      runnerName: k8s
+      {{- if .Values.global.pluginDaemonDomain }}
+      pluginDaemonPublicUrl: {{ include "dify.externalUrl" (dict "domain" .Values.global.pluginDaemonDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) }}
+      {{- else }}
+      pluginDaemonPublicUrl: http://{{ template "dify.fullname" . }}-plugin-daemon-svc:5002
+      {{- end }}
+      secret: {{ .Values.plugin_connector.imageRepoSecret }}
+      k8s:
+        useIngress: {{ .Values.plugin_connector.useIngress | default false }}
+        ingressConfig:
+          host: {{ .Values.plugin_connector.ingressHost | default "" | quote }}
+          protocol: {{ .Values.plugin_connector.ingressProtocol | default "" | quote }}
+          ingressClassName: {{ .Values.plugin_connector.ingressClassName | default "" | quote }}
+{{- end }}

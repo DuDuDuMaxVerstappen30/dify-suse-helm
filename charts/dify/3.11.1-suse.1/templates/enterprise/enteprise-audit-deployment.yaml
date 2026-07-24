@@ -1,0 +1,102 @@
+{{- if .Values.enterpriseAudit.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+{{- include "dify.labels" . | nindent 4 }}
+    app: {{ template "dify.fullname" . }}-enterprise-audit
+  name: {{ template "dify.fullname" . }}-enterprise-audit
+spec:
+  replicas: {{ .Values.enterpriseAudit.replicas }}
+  selector:
+    matchLabels:
+{{- include "dify.selectorLabels" . | nindent 6 }}
+      app: {{ template "dify.fullname" . }}-enterprise-audit
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/enterprise/enterprise-audit-config.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/enterprise/enterprise-audit-secret.yaml") . | sha256sum }}
+        checksum/shared-redis-config: {{ include (print $.Template.BasePath "/shared/redis/redis-config.yaml") . | sha256sum }}
+        checksum/shared-redis-secret: {{ include (print $.Template.BasePath "/shared/redis/redis-secret.yaml") . | sha256sum }}  
+        checksum/shared-storage-config: {{ include (print $.Template.BasePath "/shared/storage/storage-config.yaml") . | sha256sum }}
+        checksum/shared-storage-secret: {{ include (print $.Template.BasePath "/shared/storage/storage-secret.yaml") . | sha256sum }}      
+      labels:
+{{- include "dify.selectorLabels" . | nindent 8 }}
+        app: {{ template "dify.fullname" . }}-enterprise-audit
+{{- include "dify.podExtraLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Values.enterpriseAudit.serviceAccountName | quote }}
+      enableServiceLinks: false
+      {{- if include "dify.hasImagePullSecrets" . }}
+      imagePullSecrets:
+{{ include "dify.imagePullSecrets" . | nindent 8 }}
+      {{- end }}
+      {{- if include "dify.customCA.enabled" . }}
+      initContainers:
+      {{ include "dify.customCA.initContainer" . | nindent 6 }}
+      {{- end }}
+      containers:
+      - image: "{{ .Values.enterpriseAudit.image.repository }}:{{ default .Chart.AppVersion .Values.enterpriseAudit.image.tag }}"
+        imagePullPolicy: "IfNotPresent"
+        name: {{ template "dify.fullname" . }}-enterprise-audit
+        env:
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        {{- if .Values.enterpriseAudit.extraEnv }}
+        {{- toYaml .Values.enterpriseAudit.extraEnv | nindent 10 }}
+        {{- end }}
+        envFrom:
+          - configMapRef:
+              name: {{ template "dify.fullname" . }}-enterprise-audit-config
+          - secretRef:
+              name: {{ template "dify.fullname" . }}-enterprise-audit-secret
+          - configMapRef:
+              name: {{ template "dify.fullname" . }}-shared-redis-config
+          - secretRef:
+              name: {{ template "dify.fullname" . }}-shared-redis-secret
+          - configMapRef:
+              name: {{ template "dify.fullname" . }}-shared-storage-config
+          - secretRef:
+              name: {{ template "dify.fullname" . }}-shared-storage-secret
+          {{- if include "dify.customCA.enabled" . }}
+          - configMapRef:
+              name: {{ include "dify.customCA.configName" . }}
+          {{- end }}
+        ports:
+          - name: audit
+            containerPort: 8083
+            protocol: TCP
+        {{- if .Values.enterpriseAudit.readinessProbe }}
+        readinessProbe:
+          {{- toYaml .Values.enterpriseAudit.readinessProbe | nindent 12 }}
+        {{- end }}
+        {{- if .Values.enterpriseAudit.livenessProbe }}
+        livenessProbe:
+          {{- toYaml .Values.enterpriseAudit.livenessProbe | nindent 12 }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.enterpriseAudit.resources | nindent 12 }}
+        {{- if include "dify.customCA.enabled" . }}
+        volumeMounts:
+        {{ include "dify.customCA.volumeMount" . | nindent 8 }}
+        {{- end }}
+    {{- if include "dify.customCA.enabled" . }}
+      volumes:
+      {{ include "dify.customCA.volume" . | nindent 6 }}
+    {{- end }}
+    {{- if .Values.enterpriseAudit.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.enterpriseAudit.nodeSelector | indent 8 }}
+    {{- end }}
+    {{- if .Values.enterpriseAudit.affinity }}
+      affinity:
+{{ toYaml .Values.enterpriseAudit.affinity | indent 8 }}
+    {{- end }}
+    {{- if .Values.enterpriseAudit.tolerations }}
+      tolerations:
+{{ toYaml .Values.enterpriseAudit.tolerations | indent 8 }}
+    {{- end }}
+{{- end }}

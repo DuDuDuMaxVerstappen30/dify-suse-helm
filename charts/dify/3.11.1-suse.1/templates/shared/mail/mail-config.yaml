@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "dify.fullname" . }}-shared-mail-config
+data:
+  # Mail configuration, support: resend, smtp
+  MAIL_TYPE: {{ .Values.mail.type | quote }}
+  # default send from email address, if not specified
+  MAIL_DEFAULT_SEND_FROM: {{ .Values.mail.defaultSender | quote }}
+  {{- if eq .Values.mail.type "resend" }}
+  # the api-key for resend (https://resend.com)
+  RESEND_API_URL: {{ .Values.mail.resend.apiUrl | quote }}
+  {{- end }}
+  {{- if eq .Values.mail.type "smtp" }}
+  SMTP_SERVER: {{ .Values.mail.smtp.server | quote }}
+  SMTP_PORT: {{ .Values.mail.smtp.port | toString | quote }}
+  SMTP_USERNAME: {{ .Values.mail.smtp.username | quote }}
+  SMTP_USE_TLS: {{ .Values.mail.smtp.useTLS | toString | quote }}
+  {{- end }}

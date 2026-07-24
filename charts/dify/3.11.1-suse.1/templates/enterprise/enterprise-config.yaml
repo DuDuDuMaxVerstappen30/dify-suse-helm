@@ -1,0 +1,50 @@
+{{- $dbInstance := include "dify.dbInstance" . | fromJson }}
+{{- $difyDbName := include "dify.dbName" (dict "Values" .Values "credentialKey" "dify") }}
+{{- $enterpriseDbName := include "dify.dbName" (dict "Values" .Values "credentialKey" "enterprise") }}
+{{- if .Values.enterprise.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "dify.fullname" . }}-enterprise-config
+data:
+  DIFY_CONSOLE_WEB_URL: {{ include "dify.externalUrl" (dict "domain" .Values.global.consoleWebDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) | quote }}
+  DIFY_CONSOLE_API_URL: {{ include "dify.externalUrl" (dict "domain" .Values.global.consoleApiDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) | quote }}
+  DIFY_WEBAPP_URL: {{ include "dify.externalUrl" (dict "domain" .Values.global.appWebDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) | quote }}
+  DIFY_WEBAPP_API_URL: {{ include "dify.externalUrl" (dict "domain" .Values.global.appApiDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) | quote }}
+  DIFY_ENDPOINT: "http://{{ template "dify.fullname" . }}-api-svc:5001"
+  
+  DB_ENGINE: {{ $dbInstance.engine | quote }}
+  DB_HOST: {{ $dbInstance.host | quote }}
+  DB_PORT: {{ $dbInstance.port | toString | quote }}
+  DB_TZ: {{ $dbInstance.timezone | quote }}
+  DB_SSL_MODE: {{ $dbInstance.pg_ssl_mode | quote }}
+  DB_URI_SCHEME: {{ $dbInstance.pg_uri_scheme | quote }}
+  DB_EXTRAS: {{ $dbInstance.pg_extras | toString | quote }}
+  DB_PARAMS: {{ $dbInstance.mysql_params | quote }}
+  DB_TLS: {{ $dbInstance.mysql_tls | toString | quote }}
+
+  DIFY_DB_NAME: {{ $difyDbName | quote }}
+  DIFY_DB_USER: {{ (include "dify.dbCredentialUser" (dict "Values" .Values "credentialKey" "dify") | default $dbInstance.user) | quote }}
+  ENTERPRISE_DB_NAME: {{ $enterpriseDbName | quote }}
+  ENTERPRISE_DB_USER: {{ (include "dify.dbCredentialUser" (dict "Values" .Values "credentialKey" "enterprise") | default $dbInstance.user) | quote }}
+  
+  ENTERPRISE_LICENSE_MODE: {{ .Values.enterprise.licenseMode | quote }}
+  ENTERPRISE_LICENSE_SERVER: {{ .Values.enterprise.licenseServer | quote }}
+  CONSOLE_SSO_SKIP_CERT_VERIFY: {{ .Values.enterprise.consoleSSOSkipCertVerify | quote }}
+  WEB_SSO_SKIP_CERT_VERIFY: {{ .Values.enterprise.webSSOSkipCertVerify | quote }}
+  DASHBOARD_SSO_SKIP_CERT_VERIFY: {{ .Values.enterprise.dashboardSSOSkipCertVerify | quote }}
+  ENTERPRISE_URL: {{ include "dify.externalUrl" (dict "domain" .Values.global.enterpriseDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) | quote }}
+  SERVER_TIMEOUT: {{ .Values.enterprise.serverTimeout | quote }}
+  GRPC_SERVER_TIMEOUT: {{ .Values.enterprise.grpcServerTimeout | quote }}
+  PLUGIN_MANAGER_HTTP_ADDR: {{ (printf "http://%s-plugin-manager-svc:8084" (include "dify.fullname" .)) | quote }}
+  PLUGIN_MANAGER_GRPC_ADDR: {{ (printf "%s-plugin-manager-svc:9084" (include "dify.fullname" .)) | quote }}
+  WORKSPACE_SYNC_CRON: {{ .Values.enterprise.workspaceSyncCron | quote }}
+  WORKSPACE_SYNC_TIMEOUT: {{ .Values.enterprise.workspaceSyncTimeout | quote }}
+  MQ_SHARD_COUNT: "7"
+  PLUGIN_MANAGER_CLIENT_TIMEOUT: {{ .Values.enterprise.pluginManagerClientTimeout | default .Values.plugin_manager.grpcServerTimeout | quote }}
+  {{- if .Values.enterpriseRbac.enabled }}
+  RBAC_INNER_BASE_URL: "http://{{ template "dify.fullname" . }}-enterprise-rbac-svc:8086"
+  {{- end }}
+
+  LOG_FORMAT: {{ .Values.global.log.outputFormat | default "json" | quote }}
+{{- end }}

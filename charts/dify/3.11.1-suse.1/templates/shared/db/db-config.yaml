@@ -1,0 +1,18 @@
+{{- if or .Values.api.enabled .Values.worker.enabled .Values.workerBeat.enabled (include "dify.hasEnabledAdditionalWorkers" .) }}
+{{- $difyDb := include "dify.difyDatasource" . | fromJson }}
+{{- $difyDbUser := include "dify.dbCredentialUser" (dict "Values" .Values "credentialKey" "dify") }}
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "dify.fullname" . }}-shared-db-config
+data:
+  DB_TYPE: {{ $difyDb.db_type | quote }}
+  DB_HOST: {{ $difyDb.host | quote }}
+  DB_PORT: {{ $difyDb.port | toString | quote }}
+  DB_USERNAME: {{ ($difyDbUser | default $difyDb.user) | quote }}
+  DB_DATABASE: {{ $difyDb.db_name | quote }}
+  DB_EXTRAS: {{ $difyDb.db_extras | toString | quote }}
+  DB_CHARSET: {{ $difyDb.db_charset | quote }}
+  SQLALCHEMY_DATABASE_URI_SCHEME: {{ $difyDb.uri_scheme | quote }}
+{{- end }}

@@ -1,0 +1,69 @@
+{{- if .Values.enterpriseFrontend.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+{{- include "dify.labels" . | nindent 4 }}
+    app: {{ template "dify.fullname" . }}-enterprise-frontend
+  name: {{ template "dify.fullname" . }}-enterprise-frontend
+spec:
+  replicas: {{ .Values.enterprise.replicas }}
+  selector:
+    matchLabels:
+{{- include "dify.selectorLabels" . | nindent 6 }}
+      app: {{ template "dify.fullname" . }}-enterprise-frontend
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/enterprise/enterprise-frontend-config.yaml") . | sha256sum }}
+      labels:
+{{- include "dify.selectorLabels" . | nindent 8 }}
+        app: {{ template "dify.fullname" . }}-enterprise-frontend
+{{- include "dify.podExtraLabels" . | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- if include "dify.hasImagePullSecrets" . }}
+      imagePullSecrets:
+{{ include "dify.imagePullSecrets" . | nindent 8 }}
+      {{- end }}
+      containers:
+      - image: "{{ .Values.enterpriseFrontend.image.repository }}:{{ default .Chart.AppVersion .Values.enterpriseFrontend.image.tag }}"
+        imagePullPolicy: "IfNotPresent"
+        name: {{ template "dify.fullname" . }}-enterprise-frontend
+        {{- if .Values.enterpriseFrontend.extraEnv }}
+        env:
+          {{- toYaml .Values.enterpriseFrontend.extraEnv | nindent 8 }}
+        {{- end }}
+        envFrom:
+          - configMapRef:
+              name: {{ template "dify.fullname" . }}-enterprise-frontend-config
+        ports:
+          - name: web
+            containerPort: 3000
+            protocol: TCP
+        {{- if .Values.enterpriseFrontend.readinessProbe }}
+        readinessProbe:
+          {{- toYaml .Values.enterpriseFrontend.readinessProbe | nindent 12 }}
+        {{- end }}
+        {{- if .Values.enterpriseFrontend.livenessProbe }}
+        livenessProbe:
+          {{- toYaml .Values.enterpriseFrontend.livenessProbe | nindent 12 }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.enterpriseFrontend.resources | nindent 12 }}
+    {{- if .Values.enterpriseFrontend.serviceAccountName }}
+      serviceAccountName: {{ .Values.enterpriseFrontend.serviceAccountName | quote }}
+    {{- end }}
+    {{- if .Values.enterpriseFrontend.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.enterpriseFrontend.nodeSelector | indent 8 }}
+    {{- end }}
+    {{- if .Values.enterpriseFrontend.affinity }}
+      affinity:
+{{ toYaml .Values.enterpriseFrontend.affinity | indent 8 }}
+    {{- end }}
+    {{- if .Values.enterpriseFrontend.tolerations }}
+      tolerations:
+{{ toYaml .Values.enterpriseFrontend.tolerations | indent 8 }}
+    {{- end }}
+{{- end }}
