@@ -8,14 +8,14 @@ In the target cluster, open:
 
 `Apps` → `Repositories` → `Create`
 
-Select **Git Repository** and use:
+Select **Git Repository** (do not select Helm Repository) and use:
 
 - Name: `dify-ee-suse`
 - Git Repo URL: `https://github.com/DuDuDuMaxVerstappen30/dify-suse-helm.git`
 - Branch: `main`
 - Authentication: `None`
 
-The Rancher catalog layout is:
+> This repository intentionally does not contain a root `index.yaml`. Rancher must scan the Git chart directory so it can load `app-readme.md`, `questions.yaml`, and `values.yaml` together.\n\nThe Rancher catalog layout is:
 
 ```text
 charts/
