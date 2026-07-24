@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "dify.fullname" . }}-shared-redis-config
+data:
+{{- if .Values.externalRedis.enabled }}
+  {{- include "dify.redis.envBlock" . | nindent 2 }}
+{{- else if .Values.redis.enabled }}
+  {{- include "dify.redis.envBlockInternal" . | nindent 2 }}
+{{- end }}
+{{- $eb := include "dify.eventBus.envBlock" . }}
+{{- if $eb }}
+  {{- $eb | nindent 2 }}
+{{- end }}

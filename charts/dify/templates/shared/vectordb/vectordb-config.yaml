@@ -1,0 +1,100 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "dify.fullname" . }}-shared-vectordb-config
+data:
+  {{- if .Values.vectorDB.useExternal }}
+  ###################################
+  # external vector db
+  ###################################
+  VECTOR_STORE: {{ .Values.vectorDB.externalType | quote }}
+  {{- if eq .Values.vectorDB.externalType "weaviate"}}
+  # The Weaviate endpoint URL. Only available when VECTOR_STORE is `weaviate`.
+  WEAVIATE_ENDPOINT: {{ .Values.vectorDB.externalWeaviate.endpoint | quote }}
+  {{- else if eq .Values.vectorDB.externalType "qdrant" }}
+  # The Qdrant endpoint URL. Only available when VECTOR_STORE is `qdrant`.
+  QDRANT_URL: {{ .Values.vectorDB.externalQdrant.endpoint | quote }}
+  # The Qdrant client timeout setting.
+  QDRANT_CLIENT_TIMEOUT: "20"
+  {{- else if eq .Values.vectorDB.externalType "milvus" }}
+  MILVUS_URI: {{ .Values.vectorDB.externalMilvus.uri | quote }}
+  MILVUS_USER: {{ .Values.vectorDB.externalMilvus.user | quote }}
+  MILVUS_DATABASE: {{ .Values.vectorDB.externalMilvus.database | quote }}
+  {{- else if eq .Values.vectorDB.externalType "relyt" }}
+  RELYT_HOST: {{ .Values.vectorDB.externalRelyt.host | quote }}
+  RELYT_PORT: {{ .Values.vectorDB.externalRelyt.port | toString | quote }}
+  RELYT_USER: {{ .Values.vectorDB.externalRelyt.user | quote }}
+  RELYT_DATABASE: {{ .Values.vectorDB.externalRelyt.database | quote }}
+  {{- else if eq .Values.vectorDB.externalType "pgvecto-rs" }}
+  PGVECTO_RS_HOST: {{ .Values.vectorDB.externalPgVectoRS.host | quote }}
+  PGVECTO_RS_PORT: {{ .Values.vectorDB.externalPgVectoRS.port | toString | quote }}
+  PGVECTO_RS_USER: {{ .Values.vectorDB.externalPgVectoRS.user | quote }}
+  PGVECTO_RS_DATABASE: {{ .Values.vectorDB.externalPgVectoRS.database | quote }}
+  {{- else if eq .Values.vectorDB.externalType "pgvector" }}
+  PGVECTOR_HOST: {{ .Values.vectorDB.externalPgvector.host | quote }}
+  PGVECTOR_PORT: {{ .Values.vectorDB.externalPgvector.port | toString | quote }}
+  PGVECTOR_USER: {{ .Values.vectorDB.externalPgvector.user | quote }}
+  PGVECTOR_DATABASE: {{ .Values.vectorDB.externalPgvector.database | quote }}
+  PGVECTOR_MIN_CONNECTION: {{ .Values.vectorDB.externalPgvector.minConnection | toString | quote }}
+  PGVECTOR_MAX_CONNECTION: {{ .Values.vectorDB.externalPgvector.maxConnection | toString | quote }}
+  PGVECTOR_PG_BIGM: {{ .Values.vectorDB.externalPgvector.pgBigm | toString | quote }}
+  {{- else if eq .Values.vectorDB.externalType "tencent" }}
+  TENCENT_VECTOR_DB_URL: {{ .Values.vectorDB.externalTencentVectorDB.host | quote }}
+  TENCENT_VECTOR_DB_TIMEOUT: {{ .Values.vectorDB.externalTencentVectorDB.timeout | toString | quote }}
+  TENCENT_VECTOR_DB_USERNAME: {{ .Values.vectorDB.externalTencentVectorDB.username | quote }}
+  TENCENT_VECTOR_DB_SHARD: {{ .Values.vectorDB.externalTencentVectorDB.shard | toString | quote }}
+  TENCENT_VECTOR_DB_REPLICAS: {{ .Values.vectorDB.externalTencentVectorDB.replicas | toString | quote }}
+  TENCENT_VECTOR_DB_DATABASE: {{ .Values.vectorDB.externalTencentVectorDB.database | quote }}
+  {{- else if eq .Values.vectorDB.externalType "opensearch" }}
+  OPENSEARCH_HOST: {{ .Values.vectorDB.externalOpenSearch.host | quote }}
+  OPENSEARCH_PORT: {{ .Values.vectorDB.externalOpenSearch.port | toString | quote }}
+  OPENSEARCH_USER: {{ .Values.vectorDB.externalOpenSearch.user | quote }}
+  OPENSEARCH_SECURE: {{ .Values.vectorDB.externalOpenSearch.useTLS | toString | quote }}
+  {{- else if eq .Values.vectorDB.externalType "elasticsearch" }}
+  ELASTICSEARCH_HOST: {{ .Values.vectorDB.externalElasticsearch.host | quote }}
+  ELASTICSEARCH_PORT: {{ .Values.vectorDB.externalElasticsearch.port | toString | quote }}
+  ELASTICSEARCH_USERNAME: {{ .Values.vectorDB.externalElasticsearch.username | quote }}
+  {{- else if eq .Values.vectorDB.externalType "analyticdb" }}
+  ANALYTICDB_KEY_ID: {{ .Values.vectorDB.externalAnalyticDB.keyID | quote }}
+  ANALYTICDB_KEY_SECRET: {{ .Values.vectorDB.externalAnalyticDB.keySecret | quote }}
+  ANALYTICDB_REGION_ID: {{ .Values.vectorDB.externalAnalyticDB.regionID | quote }}
+  ANALYTICDB_INSTANCE_ID: {{ .Values.vectorDB.externalAnalyticDB.instanceID | quote }}
+  ANALYTICDB_ACCOUNT: {{ .Values.vectorDB.externalAnalyticDB.account | quote }}
+  ANALYTICDB_HOST: {{ .Values.vectorDB.externalAnalyticDB.host | quote }}
+  ANALYTICDB_PORT: {{ .Values.vectorDB.externalAnalyticDB.port | toString | quote }}
+  ANALYTICDB_NAMESPACE: {{ .Values.vectorDB.externalAnalyticDB.namespace | quote }}
+  ANALYTICDB_MIN_CONNECTION: {{ .Values.vectorDB.externalAnalyticDB.minConnection | toString | quote }}
+  ANALYTICDB_MAX_CONNECTION: {{ .Values.vectorDB.externalAnalyticDB.maxConnection | toString | quote }}
+  {{- else if eq .Values.vectorDB.externalType "lindorm" }}
+  LINDORM_URL: {{ .Values.vectorDB.externalLindorm.url | quote }}
+  LINDORM_USERNAME: {{ .Values.vectorDB.externalLindorm.username | quote }}
+  LINDORM_INDEX_TYPE: {{ .Values.vectorDB.externalLindorm.indexType | quote }}
+  LINDORM_DISTANCE_TYPE: {{ .Values.vectorDB.externalLindorm.distanceType | quote }}
+  LINDORM_USING_UGC: {{ .Values.vectorDB.externalLindorm.usingUgc | toString | quote }}
+  LINDORM_QUERY_TIMEOUT: {{ .Values.vectorDB.externalLindorm.queryTimeout | toString | quote }}
+  {{- end }}
+  {{- else }}
+  ###################################
+  # internal vector db
+  ###################################
+  {{- if .Values.weaviate.enabled }}
+  # The type of vector store to use. Supported values are `weaviate`, `qdrant`.
+  VECTOR_STORE: "weaviate"
+    {{- with .Values.weaviate.service }}
+      {{- if and (eq .type "ClusterIP") (not (eq .clusterIP "None"))}}
+  # The Weaviate endpoint URL. Only available when VECTOR_STORE is `weaviate`.
+  {{/*
+  Pitfall: scheme (i.e.) must be specified, or weaviate client won't function as
+  it depends on `hostname` from urllib.parse.urlparse will be empty if schema is not specified.
+  */}}
+  WEAVIATE_ENDPOINT: "{{ printf "http://%s" .name }}:80"
+      {{- end }}
+    {{- end }}
+  {{- else if .Values.qdrant.enabled }}
+  VECTOR_STORE: "qdrant"
+  # The Qdrant endpoint URL. Only available when VECTOR_STORE is `qdrant`.
+  QDRANT_URL: "http://{{ .Release.Name }}-qdrant:6333"
+  # The Qdrant client timeout setting.
+  QDRANT_CLIENT_TIMEOUT: "20"
+  {{- end }}
+  {{- end }}

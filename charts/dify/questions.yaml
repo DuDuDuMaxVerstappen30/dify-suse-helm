@@ -1,0 +1,1497 @@
+rancher_min_version: 2.9.0
+
+categories:
+  - AI
+  - LLM
+  - Developer Tools
+
+questions:
+  # 01 - General
+  - variable: enterprise.licenseMode
+    label: 企业许可模式 / License Mode
+    description: 在线模式连接 Dify License Server；离线模式需要提前准备离线许可。
+    type: enum
+    required: true
+    group: "01 基础配置 / General"
+    options:
+      - online
+      - offline
+
+  - variable: enterprise.licenseServer
+    label: 许可服务器 / License Server
+    description: 在线许可服务器地址，默认使用 Dify 官方服务。
+    type: string
+    required: true
+    group: "01 基础配置 / General"
+    show_if: "enterprise.licenseMode=online"
+
+  - variable: rancherUI.imagePullSecretName
+    label: 镜像拉取 Secret / Image Pull Secret
+    description: 选择目标命名空间中已有的镜像仓库凭证；Dify 企业镜像为私有镜像时必须配置。
+    type: secret
+    required: false
+    group: "01 基础配置 / General"
+
+  - variable: global.dbMigrationEnabled
+    label: 启用数据库迁移 / Run DB Migration
+    description: 首次安装和版本升级时保持开启。
+    type: boolean
+    required: true
+    group: "01 基础配置 / General"
+
+  - variable: global.marketplace.enabled
+    label: 启用 Dify Marketplace
+    description: 允许 Dify 访问插件 Marketplace；离线环境可关闭。
+    type: boolean
+    required: true
+    group: "01 基础配置 / General"
+
+  # 02 - Network and domains
+  - variable: ingress.enabled
+    label: 启用 Ingress
+    description: 通过一个 Ingress 将控制台、应用、API、文件和企业服务域名路由到 Dify Gateway。
+    type: boolean
+    required: true
+    group: "02 网络与域名 / Ingress"
+
+  - variable: ingress.className
+    label: IngressClass 名称
+    description: K3s 通常为 traefik；RKE2 或其他集群请填写实际 IngressClass。
+    type: string
+    required: true
+    group: "02 网络与域名 / Ingress"
+    show_if: "ingress.enabled=true"
+
+  - variable: rancherUI.traefikEntryPoint
+    label: Traefik EntryPoint
+    description: HTTP 选择 web；由 Traefik 终止 HTTPS 时选择 websecure。
+    type: enum
+    required: true
+    group: "02 网络与域名 / Ingress"
+    show_if: "ingress.enabled=true&&ingress.className=traefik"
+    options:
+      - web
+      - websecure
+
+  - variable: global.useTLS
+    label: 外部访问使用 HTTPS
+    description: 开启后 Dify 生成的外部 URL 使用 https；TLS 应由 Ingress 终止。
+    type: boolean
+    required: true
+    group: "02 网络与域名 / Ingress"
+    show_if: "ingress.enabled=true"
+
+  - variable: rancherUI.tlsSecretName
+    label: TLS Secret
+    description: 选择目标命名空间中已有的 kubernetes.io/tls Secret。留空时可在 Edit YAML 中自行配置 ingress.tls。
+    type: secret
+    required: false
+    group: "02 网络与域名 / Ingress"
+    show_if: "global.useTLS=true"
+
+  - variable: global.externalPort
+    label: 外部访问端口 / External Port
+    description: HTTP 通常为 80，HTTPS 通常为 443；使用非标准端口时填写实际端口。
+    type: int
+    required: true
+    min: 1
+    max: 65535
+    group: "02 网络与域名 / Ingress"
+
+  - variable: global.consoleWebDomain
+    label: 控制台域名 / Console Web Domain
+    description: Dify 管理控制台域名，例如 console.dify.example.com。
+    type: hostname
+    required: true
+    group: "02 网络与域名 / Ingress"
+    show_if: "ingress.enabled=true"
+
+  - variable: global.consoleApiDomain
+    label: 控制台 API 域名 / Console API Domain
+    description: 推荐与控制台域名相同；也可配置独立 API 域名。
+    type: hostname
+    required: true
+    group: "02 网络与域名 / Ingress"
+    show_if: "ingress.enabled=true"
+
+  - variable: global.appWebDomain
+    label: WebApp 域名 / App Web Domain
+    description: Dify 已发布应用的访问域名，例如 app.dify.example.com。
+    type: hostname
+    required: true
+    group: "02 网络与域名 / Ingress"
+    show_if: "ingress.enabled=true"
+
+  - variable: global.appApiDomain
+    label: WebApp API 域名 / App API Domain
+    description: 推荐与 WebApp 域名相同。
+    type: hostname
+    required: true
+    group: "02 网络与域名 / Ingress"
+    show_if: "ingress.enabled=true"
+
+  - variable: global.serviceApiDomain
+    label: Service API 域名
+    description: Dify 对外 Service API 和 MCP API 使用的域名，例如 api.dify.example.com。
+    type: hostname
+    required: true
+    group: "02 网络与域名 / Ingress"
+    show_if: "ingress.enabled=true"
+
+  - variable: global.filesDomain
+    label: 文件域名 / Files Domain
+    description: 文件上传、预览和下载 URL 使用的域名，例如 upload.dify.example.com。
+    type: hostname
+    required: true
+    group: "02 网络与域名 / Ingress"
+    show_if: "ingress.enabled=true"
+
+  - variable: global.enterpriseDomain
+    label: 企业管理域名 / Enterprise Domain
+    description: 企业管理、审计与 RBAC 前端域名，例如 enterprise.dify.example.com。
+    type: hostname
+    required: true
+    group: "02 网络与域名 / Ingress"
+    show_if: "ingress.enabled=true"
+
+  - variable: global.triggerDomain
+    label: Trigger 域名
+    description: 定时任务与触发器功能使用的域名，例如 trigger.dify.example.com。
+    type: hostname
+    required: true
+    group: "02 网络与域名 / Ingress"
+    show_if: "ingress.enabled=true"
+
+  - variable: api.consoleCorsAllowOrigins
+    label: Console CORS Origins
+    description: 控制台允许的 Origin，通常填写完整控制台 URL，例如 https://console.dify.example.com。
+    type: string
+    required: true
+    group: "02 网络与域名 / Ingress"
+
+  - variable: api.webApiCorsAllowOrigins
+    label: WebApp CORS Origins
+    description: WebApp API 允许的 Origin，通常填写完整 WebApp URL。
+    type: string
+    required: true
+    group: "02 网络与域名 / Ingress"
+
+  - variable: plugin_daemon.serviceType
+    label: Plugin Daemon Service 类型
+    description: 默认 NodePort 兼容插件安装；仅需集群内部访问时可使用 ClusterIP。
+    type: enum
+    required: true
+    group: "02 网络与域名 / Ingress"
+    options:
+      - NodePort
+      - ClusterIP
+
+  # 03 - Security
+  - variable: global.appSecretKey
+    label: Dify App Secret Key
+    description: 用于会话签名和数据库敏感信息加密。生成命令：openssl rand -base64 42
+    type: password
+    required: true
+    min_length: 32
+    group: "03 安全密钥 / Security"
+
+  - variable: global.innerApiKey
+    label: Dify Inner API Key
+    description: Dify 内部组件调用密钥。生成命令：openssl rand -base64 42
+    type: password
+    required: true
+    min_length: 32
+    group: "03 安全密钥 / Security"
+
+  - variable: enterprise.appSecretKey
+    label: Enterprise App Secret Key
+    description: 企业服务 JWT 和会话密钥。生成命令：openssl rand -base64 42
+    type: password
+    required: true
+    min_length: 32
+    group: "03 安全密钥 / Security"
+
+  - variable: enterprise.adminAPIsSecretKeySalt
+    label: Enterprise Admin API Salt
+    description: 企业管理 API 密钥盐值，请使用独立随机值。
+    type: password
+    required: true
+    min_length: 16
+    group: "03 安全密钥 / Security"
+
+  - variable: enterprise.passwordEncryptionKey
+    label: Password Encryption Key
+    description: Base64 编码的 32 字节 AES-256 密钥。生成命令：openssl rand -base64 32
+    type: password
+    required: true
+    min_length: 43
+    group: "03 安全密钥 / Security"
+
+  - variable: global.customCA.enabled
+    label: 使用自定义 CA
+    description: 私有镜像仓库、模型服务或外部系统使用企业私有 CA 时开启。
+    type: boolean
+    required: true
+    group: "03 安全密钥 / Security"
+
+  - variable: global.customCA.existingSecret
+    label: 自定义 CA Secret
+    description: 包含 CA 证书的已有 Secret。
+    type: secret
+    required: true
+    group: "03 安全密钥 / Security"
+    show_if: "global.customCA.enabled=true"
+
+  - variable: global.customCA.key
+    label: CA Secret Key
+    description: Secret 中保存 CA 证书的键名。
+    type: string
+    required: true
+    group: "03 安全密钥 / Security"
+    show_if: "global.customCA.enabled=true"
+
+  # 04 - Database
+  - variable: postgresql.enabled
+    label: 使用内置 PostgreSQL
+    description: 适合测试、演示和小规模环境。生产环境可关闭并配置外部高可用数据库。
+    type: boolean
+    required: true
+    group: "04 数据库 / Database"
+
+  - variable: postgresql.global.postgresql.auth.postgresPassword
+    label: PostgreSQL 管理员密码
+    description: 内置 PostgreSQL 的 postgres 用户密码。
+    type: password
+    required: true
+    min_length: 12
+    group: "04 数据库 / Database"
+    show_if: "postgresql.enabled=true"
+
+  - variable: postgresql.global.storageClass
+    label: PostgreSQL StorageClass
+    description: 内置 PostgreSQL 数据卷使用的 StorageClass。
+    type: storageclass
+    required: true
+    group: "04 数据库 / Database"
+    show_if: "postgresql.enabled=true"
+
+  - variable: postgresql.primary.persistence.size
+    label: PostgreSQL 数据卷大小
+    description: 示例：10Gi。生产环境请按数据增长量规划。
+    type: string
+    required: true
+    group: "04 数据库 / Database"
+    show_if: "postgresql.enabled=true"
+
+  - variable: externalDatabase.enabled
+    label: 使用外部数据库
+    description: 关闭内置 PostgreSQL 后必须开启；Chart 会校验两种数据库模式只能启用一个。
+    type: boolean
+    required: true
+    group: "04 数据库 / Database"
+    show_if: "postgresql.enabled=false"
+
+  - variable: externalDatabase.engine
+    label: 外部数据库类型
+    description: 支持 PostgreSQL、MySQL 和 TiDB。
+    type: enum
+    required: true
+    group: "04 数据库 / Database"
+    show_if: "externalDatabase.enabled=true"
+    options:
+      - postgres
+      - mysql
+      - tidb
+
+  - variable: externalDatabase.host
+    label: 数据库主机
+    description: 外部数据库服务的 DNS 名称或 IP。
+    type: string
+    required: true
+    group: "04 数据库 / Database"
+    show_if: "externalDatabase.enabled=true"
+
+  - variable: externalDatabase.port
+    label: 数据库端口
+    description: PostgreSQL 默认 5432，MySQL 默认 3306，TiDB 默认 4000。
+    type: int
+    required: true
+    min: 1
+    max: 65535
+    group: "04 数据库 / Database"
+    show_if: "externalDatabase.enabled=true"
+
+  - variable: externalDatabase.user
+    label: 数据库用户名
+    description: 需要具备访问 Dify、Enterprise、Audit 和 Plugin Daemon 数据库的权限。
+    type: string
+    required: true
+    group: "04 数据库 / Database"
+    show_if: "externalDatabase.enabled=true"
+
+  - variable: externalDatabase.password
+    label: 数据库密码
+    description: 外部数据库用户密码。
+    type: password
+    required: true
+    group: "04 数据库 / Database"
+    show_if: "externalDatabase.enabled=true"
+
+  - variable: externalDatabase.databases.dify
+    label: Dify 数据库名
+    description: 核心 Dify 数据库名称。
+    type: string
+    required: true
+    group: "04 数据库 / Database"
+    show_if: "externalDatabase.enabled=true"
+
+  - variable: externalDatabase.databases.enterprise
+    label: Enterprise 数据库名
+    description: 企业服务数据库名称。
+    type: string
+    required: true
+    group: "04 数据库 / Database"
+    show_if: "externalDatabase.enabled=true"
+
+  - variable: externalDatabase.databases.audit
+    label: Audit 数据库名
+    description: 企业审计数据库名称。
+    type: string
+    required: true
+    group: "04 数据库 / Database"
+    show_if: "externalDatabase.enabled=true"
+
+  - variable: externalDatabase.databases.plugin_daemon
+    label: Plugin Daemon 数据库名
+    description: 插件运行时数据库名称。
+    type: string
+    required: true
+    group: "04 数据库 / Database"
+    show_if: "externalDatabase.enabled=true"
+
+  - variable: externalDatabase.dialectOptions.postgres.sslMode
+    label: PostgreSQL SSL Mode
+    description: 外部 PostgreSQL 的 SSL 模式。
+    type: enum
+    required: true
+    group: "04 数据库 / Database"
+    show_if: "externalDatabase.enabled=true&&externalDatabase.engine=postgres"
+    options:
+      - disable
+      - require
+      - verify-ca
+      - verify-full
+
+  # 05 - Redis
+  - variable: redis.enabled
+    label: 使用内置 Redis
+    description: 适合测试、演示和小规模环境。生产环境可关闭并连接外部 Redis。
+    type: boolean
+    required: true
+    group: "05 Redis"
+
+  - variable: redis.global.redis.password
+    label: Redis 密码
+    description: 内置 Redis 的访问密码。
+    type: password
+    required: true
+    min_length: 12
+    group: "05 Redis"
+    show_if: "redis.enabled=true"
+
+  - variable: redis.global.storageClass
+    label: Redis StorageClass
+    description: 内置 Redis 数据卷使用的 StorageClass。
+    type: storageclass
+    required: true
+    group: "05 Redis"
+    show_if: "redis.enabled=true"
+
+  - variable: redis.master.persistence.size
+    label: Redis 数据卷大小
+    description: 示例：5Gi。
+    type: string
+    required: true
+    group: "05 Redis"
+    show_if: "redis.enabled=true"
+
+  - variable: externalRedis.enabled
+    label: 使用外部 Redis
+    description: 关闭内置 Redis 后必须开启；主 Redis 不支持 Redis Cluster，可使用 standalone 或 sentinel。
+    type: boolean
+    required: true
+    group: "05 Redis"
+    show_if: "redis.enabled=false"
+
+  - variable: externalRedis.host
+    label: Redis 主机
+    description: 外部 Redis DNS 名称或 IP。
+    type: string
+    required: true
+    group: "05 Redis"
+    show_if: "externalRedis.enabled=true"
+
+  - variable: externalRedis.port
+    label: Redis 端口
+    description: 默认 6379。
+    type: int
+    required: true
+    min: 1
+    max: 65535
+    group: "05 Redis"
+    show_if: "externalRedis.enabled=true"
+
+  - variable: externalRedis.username
+    label: Redis 用户名
+    description: 未启用 Redis ACL 时可留空。
+    type: string
+    required: false
+    group: "05 Redis"
+    show_if: "externalRedis.enabled=true"
+
+  - variable: externalRedis.password
+    label: Redis 密码
+    description: 外部 Redis 密码。
+    type: password
+    required: true
+    group: "05 Redis"
+    show_if: "externalRedis.enabled=true"
+
+  - variable: externalRedis.db
+    label: Redis DB
+    description: Redis 逻辑数据库编号。
+    type: int
+    required: true
+    min: 0
+    group: "05 Redis"
+    show_if: "externalRedis.enabled=true"
+
+  - variable: externalRedis.useSSL
+    label: Redis 使用 TLS
+    description: 外部 Redis 启用 TLS 时开启。
+    type: boolean
+    required: true
+    group: "05 Redis"
+    show_if: "externalRedis.enabled=true"
+
+  - variable: externalRedis.sentinel.enabled
+    label: 使用 Redis Sentinel
+    description: 外部 Redis 为 Sentinel 架构时开启。
+    type: boolean
+    required: true
+    group: "05 Redis"
+    show_if: "externalRedis.enabled=true"
+
+  - variable: externalRedis.sentinel.nodes
+    label: Sentinel 节点
+    description: 逗号分隔的 host:port 列表。
+    type: string
+    required: true
+    group: "05 Redis"
+    show_if: "externalRedis.sentinel.enabled=true"
+
+  - variable: externalRedis.sentinel.serviceName
+    label: Sentinel Service Name
+    description: Sentinel 监控的主服务名称。
+    type: string
+    required: true
+    group: "05 Redis"
+    show_if: "externalRedis.sentinel.enabled=true"
+
+  - variable: externalRedis.sentinel.password
+    label: Sentinel 密码
+    description: Sentinel 认证密码。
+    type: password
+    required: false
+    group: "05 Redis"
+    show_if: "externalRedis.sentinel.enabled=true"
+
+  # 06 - Vector database
+  - variable: qdrant.enabled
+    label: 使用内置 Qdrant
+    description: 默认的向量数据库模式。使用外部向量数据库时请关闭。
+    type: boolean
+    required: true
+    group: "06 向量数据库 / Vector DB"
+
+  - variable: qdrant.apiKey
+    label: Qdrant API Key
+    description: 内置 Qdrant 的访问密钥，请勿使用示例密码。
+    type: password
+    required: true
+    min_length: 12
+    group: "06 向量数据库 / Vector DB"
+    show_if: "qdrant.enabled=true"
+
+  - variable: qdrant.replicaCount
+    label: Qdrant 副本数
+    description: 当前验证配置为 1；生产高可用需要同时规划共享/分布式存储与 Qdrant 集群参数。
+    type: int
+    required: true
+    min: 1
+    group: "06 向量数据库 / Vector DB"
+    show_if: "qdrant.enabled=true"
+
+  - variable: qdrant.persistence.storageClassName
+    label: Qdrant StorageClass
+    description: 内置 Qdrant 数据卷使用的 StorageClass。
+    type: storageclass
+    required: true
+    group: "06 向量数据库 / Vector DB"
+    show_if: "qdrant.enabled=true"
+
+  - variable: qdrant.persistence.size
+    label: Qdrant 数据卷大小
+    description: 示例：10Gi。
+    type: string
+    required: true
+    group: "06 向量数据库 / Vector DB"
+    show_if: "qdrant.enabled=true"
+
+  - variable: vectorDB.useExternal
+    label: 使用外部向量数据库
+    description: 使用前先关闭内置 Qdrant；Chart 会校验内置与外部模式不能同时启用。
+    type: boolean
+    required: true
+    group: "06 向量数据库 / Vector DB"
+    show_if: "qdrant.enabled=false"
+
+  - variable: vectorDB.externalType
+    label: 外部向量数据库类型
+    description: 表单覆盖常用类型；其他上游支持的类型可在 Edit YAML 中配置。
+    type: enum
+    required: true
+    group: "06 向量数据库 / Vector DB"
+    show_if: "vectorDB.useExternal=true"
+    options:
+      - qdrant
+      - weaviate
+      - milvus
+      - pgvector
+      - opensearch
+      - elasticsearch
+
+  - variable: vectorDB.externalQdrant.endpoint
+    label: 外部 Qdrant Endpoint
+    description: 完整 URL，例如 https://qdrant.example.com。
+    type: string
+    required: true
+    group: "06 向量数据库 / Vector DB"
+    show_if: "vectorDB.useExternal=true&&vectorDB.externalType=qdrant"
+
+  - variable: vectorDB.externalQdrant.apiKey
+    label: 外部 Qdrant API Key
+    description: 外部 Qdrant 访问密钥。
+    type: password
+    required: true
+    group: "06 向量数据库 / Vector DB"
+    show_if: "vectorDB.useExternal=true&&vectorDB.externalType=qdrant"
+
+  - variable: vectorDB.externalWeaviate.endpoint
+    label: 外部 Weaviate Endpoint
+    description: 完整 URL，例如 https://weaviate.example.com。
+    type: string
+    required: true
+    group: "06 向量数据库 / Vector DB"
+    show_if: "vectorDB.useExternal=true&&vectorDB.externalType=weaviate"
+
+  - variable: vectorDB.externalWeaviate.apiKey
+    label: 外部 Weaviate API Key
+    description: 外部 Weaviate 访问密钥。
+    type: password
+    required: true
+    group: "06 向量数据库 / Vector DB"
+    show_if: "vectorDB.useExternal=true&&vectorDB.externalType=weaviate"
+
+  - variable: vectorDB.externalMilvus.uri
+    label: Milvus URI
+    description: 例如 http://milvus.example.com:19530。
+    type: string
+    required: true
+    group: "06 向量数据库 / Vector DB"
+    show_if: "vectorDB.useExternal=true&&vectorDB.externalType=milvus"
+
+  - variable: vectorDB.externalMilvus.token
+    label: Milvus Token
+    description: 使用 Token 认证时填写。
+    type: password
+    required: false
+    group: "06 向量数据库 / Vector DB"
+    show_if: "vectorDB.useExternal=true&&vectorDB.externalType=milvus"
+
+  - variable: vectorDB.externalMilvus.user
+    label: Milvus 用户名
+    description: 使用用户名/密码认证时填写。
+    type: string
+    required: false
+    group: "06 向量数据库 / Vector DB"
+    show_if: "vectorDB.useExternal=true&&vectorDB.externalType=milvus"
+
+  - variable: vectorDB.externalMilvus.password
+    label: Milvus 密码
+    description: 使用用户名/密码认证时填写。
+    type: password
+    required: false
+    group: "06 向量数据库 / Vector DB"
+    show_if: "vectorDB.useExternal=true&&vectorDB.externalType=milvus"
+
+  - variable: vectorDB.externalPgvector.host
+    label: pgvector 主机
+    type: string
+    required: true
+    group: "06 向量数据库 / Vector DB"
+    show_if: "vectorDB.useExternal=true&&vectorDB.externalType=pgvector"
+
+  - variable: vectorDB.externalPgvector.port
+    label: pgvector 端口
+    type: int
+    required: true
+    min: 1
+    max: 65535
+    group: "06 向量数据库 / Vector DB"
+    show_if: "vectorDB.useExternal=true&&vectorDB.externalType=pgvector"
+
+  - variable: vectorDB.externalPgvector.user
+    label: pgvector 用户名
+    type: string
+    required: true
+    group: "06 向量数据库 / Vector DB"
+    show_if: "vectorDB.useExternal=true&&vectorDB.externalType=pgvector"
+
+  - variable: vectorDB.externalPgvector.password
+    label: pgvector 密码
+    type: password
+    required: true
+    group: "06 向量数据库 / Vector DB"
+    show_if: "vectorDB.useExternal=true&&vectorDB.externalType=pgvector"
+
+  - variable: vectorDB.externalPgvector.database
+    label: pgvector 数据库名
+    type: string
+    required: true
+    group: "06 向量数据库 / Vector DB"
+    show_if: "vectorDB.useExternal=true&&vectorDB.externalType=pgvector"
+
+  - variable: vectorDB.externalOpenSearch.host
+    label: OpenSearch 主机
+    type: string
+    required: true
+    group: "06 向量数据库 / Vector DB"
+    show_if: "vectorDB.useExternal=true&&vectorDB.externalType=opensearch"
+
+  - variable: vectorDB.externalOpenSearch.port
+    label: OpenSearch 端口
+    type: int
+    required: true
+    group: "06 向量数据库 / Vector DB"
+    show_if: "vectorDB.useExternal=true&&vectorDB.externalType=opensearch"
+
+  - variable: vectorDB.externalOpenSearch.user
+    label: OpenSearch 用户名
+    type: string
+    required: false
+    group: "06 向量数据库 / Vector DB"
+    show_if: "vectorDB.useExternal=true&&vectorDB.externalType=opensearch"
+
+  - variable: vectorDB.externalOpenSearch.password
+    label: OpenSearch 密码
+    type: password
+    required: false
+    group: "06 向量数据库 / Vector DB"
+    show_if: "vectorDB.useExternal=true&&vectorDB.externalType=opensearch"
+
+  - variable: vectorDB.externalOpenSearch.useTLS
+    label: OpenSearch 使用 TLS
+    type: boolean
+    required: true
+    group: "06 向量数据库 / Vector DB"
+    show_if: "vectorDB.useExternal=true&&vectorDB.externalType=opensearch"
+
+  - variable: vectorDB.externalElasticsearch.host
+    label: Elasticsearch 主机
+    type: string
+    required: true
+    group: "06 向量数据库 / Vector DB"
+    show_if: "vectorDB.useExternal=true&&vectorDB.externalType=elasticsearch"
+
+  - variable: vectorDB.externalElasticsearch.port
+    label: Elasticsearch 端口
+    type: int
+    required: true
+    group: "06 向量数据库 / Vector DB"
+    show_if: "vectorDB.useExternal=true&&vectorDB.externalType=elasticsearch"
+
+  - variable: vectorDB.externalElasticsearch.username
+    label: Elasticsearch 用户名
+    type: string
+    required: false
+    group: "06 向量数据库 / Vector DB"
+    show_if: "vectorDB.useExternal=true&&vectorDB.externalType=elasticsearch"
+
+  - variable: vectorDB.externalElasticsearch.password
+    label: Elasticsearch 密码
+    type: password
+    required: false
+    group: "06 向量数据库 / Vector DB"
+    show_if: "vectorDB.useExternal=true&&vectorDB.externalType=elasticsearch"
+
+  # 07 - File storage
+  - variable: persistence.type
+    label: 文件存储类型 / Storage Type
+    description: local 使用 PVC；生产多副本通常建议使用 RWX 存储或对象存储。
+    type: enum
+    required: true
+    group: "07 文件存储 / Persistence"
+    options:
+      - local
+      - s3
+      - azure-blob
+      - aliyun-oss
+      - google-storage
+      - tencent-cos
+      - huawei-obs
+      - volcengine-tos
+
+  - variable: persistence.local.persistentVolumeClaim.existingClaim
+    label: 已有后端 PVC / Existing PVC
+    description: 可选。选择后不会创建新 PVC；留空则根据 StorageClass 和容量自动创建。
+    type: pvc
+    required: false
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=local"
+
+  - variable: persistence.local.persistentVolumeClaim.storageClass
+    label: 后端文件 StorageClass
+    description: 自动创建 Dify 后端 PVC 时使用。K3s 测试环境通常为 local-path。
+    type: storageclass
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=local"
+
+  - variable: persistence.local.persistentVolumeClaim.size
+    label: 后端文件卷大小
+    description: 示例：5Gi。
+    type: string
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=local"
+
+  - variable: persistence.local.mountPath
+    label: 容器内挂载路径
+    description: 通常保持 /app/api/storage。
+    type: string
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=local"
+
+  - variable: persistence.s3.endpoint
+    label: S3 Endpoint
+    description: S3 或兼容对象存储的完整 Endpoint。
+    type: string
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=s3"
+
+  - variable: persistence.s3.bucketName
+    label: S3 Bucket
+    type: string
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=s3"
+
+  - variable: persistence.s3.region
+    label: S3 Region
+    type: string
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=s3"
+
+  - variable: persistence.s3.useAwsManagedIam
+    label: 使用 AWS Managed IAM
+    description: 使用 Pod/Workload Identity 时开启，不再需要 Access Key。
+    type: boolean
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=s3"
+
+  - variable: persistence.s3.accessKey
+    label: S3 Access Key
+    type: password
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=s3&&persistence.s3.useAwsManagedIam=false"
+
+  - variable: persistence.s3.secretKey
+    label: S3 Secret Key
+    type: password
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=s3&&persistence.s3.useAwsManagedIam=false"
+
+  - variable: persistence.azureBlob.accountName
+    label: Azure Blob Account
+    type: string
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=azure-blob"
+
+  - variable: persistence.azureBlob.containerName
+    label: Azure Blob Container
+    type: string
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=azure-blob"
+
+  - variable: persistence.azureBlob.accountUrl
+    label: Azure Blob Account URL
+    type: string
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=azure-blob"
+
+  - variable: persistence.azureBlob.useManagedIdentity
+    label: 使用 Azure Managed Identity
+    type: boolean
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=azure-blob"
+
+  - variable: persistence.azureBlob.accountKey
+    label: Azure Blob Account Key
+    type: password
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=azure-blob&&persistence.azureBlob.useManagedIdentity=false"
+
+  - variable: persistence.aliyunOss.endpoint
+    label: 阿里云 OSS Endpoint
+    type: string
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=aliyun-oss"
+
+  - variable: persistence.aliyunOss.bucketName
+    label: 阿里云 OSS Bucket
+    type: string
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=aliyun-oss"
+
+  - variable: persistence.aliyunOss.region
+    label: 阿里云 OSS Region
+    type: string
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=aliyun-oss"
+
+  - variable: persistence.aliyunOss.accessKey
+    label: 阿里云 OSS Access Key
+    type: password
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=aliyun-oss"
+
+  - variable: persistence.aliyunOss.secretKey
+    label: 阿里云 OSS Secret Key
+    type: password
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=aliyun-oss"
+
+  - variable: persistence.googleStorage.bucketName
+    label: Google Storage Bucket
+    type: string
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=google-storage"
+
+  - variable: persistence.googleStorage.serviceAccountJson
+    label: Google Service Account JSON (Base64)
+    description: Base64 编码后的 Service Account JSON 内容。
+    type: password
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=google-storage"
+
+  - variable: persistence.tencentCos.bucketName
+    label: 腾讯云 COS Bucket
+    type: string
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=tencent-cos"
+
+  - variable: persistence.tencentCos.region
+    label: 腾讯云 COS Region
+    type: string
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=tencent-cos"
+
+  - variable: persistence.tencentCos.secretId
+    label: 腾讯云 COS Secret ID
+    type: password
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=tencent-cos"
+
+  - variable: persistence.tencentCos.secretKey
+    label: 腾讯云 COS Secret Key
+    type: password
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=tencent-cos"
+
+  - variable: persistence.huaweiObs.server
+    label: 华为云 OBS Server
+    type: string
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=huawei-obs"
+
+  - variable: persistence.huaweiObs.bucketName
+    label: 华为云 OBS Bucket
+    type: string
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=huawei-obs"
+
+  - variable: persistence.huaweiObs.accessKey
+    label: 华为云 OBS Access Key
+    type: password
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=huawei-obs"
+
+  - variable: persistence.huaweiObs.secretKey
+    label: 华为云 OBS Secret Key
+    type: password
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=huawei-obs"
+
+  - variable: persistence.volcengineTos.endpoint
+    label: 火山引擎 TOS Endpoint
+    type: string
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=volcengine-tos"
+
+  - variable: persistence.volcengineTos.bucketName
+    label: 火山引擎 TOS Bucket
+    type: string
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=volcengine-tos"
+
+  - variable: persistence.volcengineTos.region
+    label: 火山引擎 TOS Region
+    type: string
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=volcengine-tos"
+
+  - variable: persistence.volcengineTos.accessKey
+    label: 火山引擎 TOS Access Key
+    type: password
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=volcengine-tos"
+
+  - variable: persistence.volcengineTos.secretKey
+    label: 火山引擎 TOS Secret Key
+    type: password
+    required: true
+    group: "07 文件存储 / Persistence"
+    show_if: "persistence.type=volcengine-tos"
+
+  # 08 - Sizing
+  - variable: api.replicas
+    label: API 副本数
+    type: int
+    required: true
+    min: 1
+    group: "08 组件规模 / Sizing"
+
+  - variable: api.serverWorkerAmount
+    label: 每个 API Pod 的 Server Worker 数
+    description: 增加前请结合 CPU 和数据库连接池容量评估。
+    type: int
+    required: true
+    min: 1
+    group: "08 组件规模 / Sizing"
+
+  - variable: web.replicas
+    label: Web 副本数
+    type: int
+    required: true
+    min: 1
+    group: "08 组件规模 / Sizing"
+
+  - variable: worker.replicas
+    label: Worker 副本数
+    type: int
+    required: true
+    min: 1
+    group: "08 组件规模 / Sizing"
+
+  - variable: worker.celeryWorkerAmount
+    label: 每个 Worker Pod 的 Celery 并发数
+    description: 提高并发会增加 CPU、内存、Redis 和数据库压力。
+    type: int
+    required: true
+    min: 1
+    group: "08 组件规模 / Sizing"
+
+  - variable: gateway.replicas
+    label: Gateway 副本数
+    type: int
+    required: true
+    min: 1
+    group: "08 组件规模 / Sizing"
+
+  - variable: enterprise.replicas
+    label: Enterprise 后端副本数
+    type: int
+    required: true
+    min: 1
+    group: "08 组件规模 / Sizing"
+
+  - variable: enterpriseFrontend.replicas
+    label: Enterprise Frontend 副本数
+    type: int
+    required: true
+    min: 1
+    group: "08 组件规模 / Sizing"
+
+  - variable: enterpriseAudit.replicas
+    label: Enterprise Audit 副本数
+    type: int
+    required: true
+    min: 1
+    group: "08 组件规模 / Sizing"
+
+  - variable: enterpriseRbac.replicas
+    label: Enterprise RBAC 副本数
+    type: int
+    required: true
+    min: 1
+    group: "08 组件规模 / Sizing"
+
+  - variable: sandbox.replicas
+    label: Sandbox 副本数
+    type: int
+    required: true
+    min: 1
+    group: "08 组件规模 / Sizing"
+
+  - variable: sandbox.maxWorkers
+    label: 每个 Sandbox Pod 的 Worker 数
+    type: int
+    required: true
+    min: 1
+    group: "08 组件规模 / Sizing"
+
+  - variable: plugin_manager.replicas
+    label: Plugin Manager 副本数
+    type: int
+    required: true
+    min: 1
+    group: "08 组件规模 / Sizing"
+
+  - variable: plugin_daemon.replicas
+    label: Plugin Daemon 副本数
+    type: int
+    required: true
+    min: 1
+    group: "08 组件规模 / Sizing"
+
+  - variable: plugin_controller.replicas
+    label: Plugin Controller 副本数
+    type: int
+    required: true
+    min: 1
+    group: "08 组件规模 / Sizing"
+
+  - variable: plugin_connector.replicas
+    label: Plugin Connector 副本数
+    type: int
+    required: true
+    min: 1
+    group: "08 组件规模 / Sizing"
+
+  # 09 - Images
+  - variable: api.image.repository
+    label: API 镜像仓库
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: api.image.tag
+    label: API 镜像 Tag
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: worker.image.repository
+    label: Worker 镜像仓库
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: worker.image.tag
+    label: Worker 镜像 Tag
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: workerBeat.image.repository
+    label: Worker Beat 镜像仓库
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: workerBeat.image.tag
+    label: Worker Beat 镜像 Tag
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: web.image.repository
+    label: Web 镜像仓库
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: web.image.tag
+    label: Web 镜像 Tag
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: enterprise.image.repository
+    label: Enterprise 镜像仓库
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: enterprise.image.tag
+    label: Enterprise 镜像 Tag
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: enterpriseAudit.image.repository
+    label: Enterprise Audit 镜像仓库
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: enterpriseAudit.image.tag
+    label: Enterprise Audit 镜像 Tag
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: enterpriseFrontend.image.repository
+    label: Enterprise Frontend 镜像仓库
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: enterpriseFrontend.image.tag
+    label: Enterprise Frontend 镜像 Tag
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: enterpriseRbac.image.repository
+    label: Enterprise RBAC 镜像仓库
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: enterpriseRbac.image.tag
+    label: Enterprise RBAC 镜像 Tag
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: enterpriseCollector.image.repository
+    label: Enterprise Collector 镜像仓库
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: enterpriseCollector.image.tag
+    label: Enterprise Collector 镜像 Tag
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: gateway.image.repository
+    label: Gateway 镜像仓库
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: gateway.image.tag
+    label: Gateway 镜像 Tag
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: plugin_daemon.image.repository
+    label: Plugin Daemon 镜像仓库
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: plugin_daemon.image.tag
+    label: Plugin Daemon 镜像 Tag
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: plugin_manager.image.repository
+    label: Plugin Manager 镜像仓库
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: plugin_manager.image.tag
+    label: Plugin Manager 镜像 Tag
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: plugin_controller.image.repository
+    label: Plugin Controller 镜像仓库
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: plugin_controller.image.tag
+    label: Plugin Controller 镜像 Tag
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: plugin_connector.image.repository
+    label: Plugin Connector 镜像仓库
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: plugin_connector.image.tag
+    label: Plugin Connector 镜像 Tag
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: sandbox.image.repository
+    label: Sandbox 镜像仓库
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: sandbox.image.tag
+    label: Sandbox 镜像 Tag
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: ssrfProxy.image.repository
+    label: SSRF Proxy 镜像仓库
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: ssrfProxy.image.tag
+    label: SSRF Proxy 镜像 Tag
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+
+  - variable: postgresql.image.repository
+    label: PostgreSQL 镜像仓库
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+    show_if: "postgresql.enabled=true"
+
+  - variable: redis.image.repository
+    label: Redis 镜像仓库
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+    show_if: "redis.enabled=true"
+
+  - variable: redis.image.tag
+    label: Redis 镜像 Tag
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+    show_if: "redis.enabled=true"
+
+  - variable: qdrant.image.repository
+    label: Qdrant 镜像仓库
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+    show_if: "qdrant.enabled=true"
+
+  - variable: qdrant.image.tag
+    label: Qdrant 镜像 Tag
+    type: string
+    required: true
+    group: "09 容器镜像 / Images"
+    show_if: "qdrant.enabled=true"
+
+  # 10 - Features and observability
+  - variable: global.otel.enabled
+    label: 启用 Dify 企业遥测
+    description: 将 Dify Trace 和 Metric 发送到内置 Enterprise Collector。
+    type: boolean
+    required: true
+    group: "10 功能与可观测性 / Features"
+
+  - variable: global.otel.samplingRate
+    label: Trace 采样率
+    description: 0.0 到 1.0，例如 0.2 表示采样 20%。
+    type: string
+    required: true
+    group: "10 功能与可观测性 / Features"
+    show_if: "global.otel.enabled=true"
+
+  - variable: global.otel.sender.includeContent
+    label: Trace 包含输入输出内容
+    description: 可能包含业务敏感数据，生产环境建议保持关闭。
+    type: boolean
+    required: true
+    group: "10 功能与可观测性 / Features"
+    show_if: "global.otel.enabled=true"
+
+  - variable: enterpriseCollector.enabled
+    label: 部署 Enterprise Collector
+    description: global.otel.enabled=true 时保持开启。
+    type: boolean
+    required: true
+    group: "10 功能与可观测性 / Features"
+
+  - variable: collaboration.enabled
+    label: 启用多人协作编辑
+    description: 部署专用 WebSocket 服务并启用工作流多人协作。
+    type: boolean
+    required: true
+    group: "10 功能与可观测性 / Features"
+
+  - variable: global.rag.etlType
+    label: RAG ETL 类型
+    description: dify 使用内置 ETL；Unstructured 使用随 Chart 部署的 Unstructured 服务。
+    type: enum
+    required: true
+    group: "10 功能与可观测性 / Features"
+    options:
+      - dify
+      - Unstructured
+
+  - variable: unstructured.enabled
+    label: 部署 Unstructured
+    description: 仅在 RAG ETL 类型为 Unstructured 时需要。
+    type: boolean
+    required: true
+    group: "10 功能与可观测性 / Features"
+    show_if: "global.rag.etlType=Unstructured"
+
+  - variable: api.openapi.enabled
+    label: 启用 OpenAPI
+    description: 开放 /openapi/v1/* 端点供 difyctl 或其他程序化客户端使用。
+    type: boolean
+    required: true
+    group: "10 功能与可观测性 / Features"
+
+  - variable: externalPrometheus.enabled
+    label: 使用外部 Prometheus
+    description: Plugin Manager 从 Prometheus 查询插件资源指标时开启。
+    type: boolean
+    required: true
+    group: "10 功能与可观测性 / Features"
+
+  - variable: externalPrometheus.endpoint
+    label: Prometheus Endpoint
+    description: 例如 http://prometheus.monitoring.svc:9090。
+    type: string
+    required: true
+    group: "10 功能与可观测性 / Features"
+    show_if: "externalPrometheus.enabled=true"
+
+  # 11 - Mail
+  - variable: mail.type
+    label: 邮件服务类型
+    description: 不发送邮件可留空；支持 SMTP 或 Resend。
+    type: enum
+    required: false
+    group: "11 邮件 / Mail"
+    options:
+      - ""
+      - smtp
+      - resend
+
+  - variable: mail.defaultSender
+    label: 默认发件人
+    description: 例如 no-reply <no-reply@example.com>。
+    type: string
+    required: true
+    group: "11 邮件 / Mail"
+    show_if: "mail.type=smtp"
+
+  - variable: mail.smtp.server
+    label: SMTP Server
+    type: string
+    required: true
+    group: "11 邮件 / Mail"
+    show_if: "mail.type=smtp"
+
+  - variable: mail.smtp.port
+    label: SMTP Port
+    type: int
+    required: true
+    min: 1
+    max: 65535
+    group: "11 邮件 / Mail"
+    show_if: "mail.type=smtp"
+
+  - variable: mail.smtp.username
+    label: SMTP Username
+    type: string
+    required: true
+    group: "11 邮件 / Mail"
+    show_if: "mail.type=smtp"
+
+  - variable: mail.smtp.password
+    label: SMTP Password
+    type: password
+    required: true
+    group: "11 邮件 / Mail"
+    show_if: "mail.type=smtp"
+
+  - variable: mail.smtp.useTLS
+    label: SMTP 使用 TLS
+    type: boolean
+    required: true
+    group: "11 邮件 / Mail"
+    show_if: "mail.type=smtp"
+
+  - variable: mail.resend.apiKey
+    label: Resend API Key
+    type: password
+    required: true
+    group: "11 邮件 / Mail"
+    show_if: "mail.type=resend"
+
+  - variable: mail.resend.apiUrl
+    label: Resend API URL
+    type: string
+    required: true
+    group: "11 邮件 / Mail"
+    show_if: "mail.type=resend"

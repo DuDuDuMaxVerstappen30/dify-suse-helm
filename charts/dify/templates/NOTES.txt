@@ -1,0 +1,15 @@
+Dify Enterprise {{ .Chart.AppVersion }} has been installed.
+
+Console:    {{ include "dify.externalUrl" (dict "domain" .Values.global.consoleWebDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) }}
+WebApp:     {{ include "dify.externalUrl" (dict "domain" .Values.global.appWebDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) }}
+Service API: {{ include "dify.externalUrl" (dict "domain" .Values.global.serviceApiDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) }}
+Enterprise: {{ include "dify.externalUrl" (dict "domain" .Values.global.enterpriseDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) }}
+
+Before opening Dify:
+  1. Point all configured domains to the Ingress Controller address.
+  2. Wait for PostgreSQL migration and all Dify workloads to become Ready.
+  3. Confirm the Dify Enterprise license and private image credentials are valid.
+
+Security:
+  - Back up the configured application and encryption keys.
+  - Do not change encryption keys during an upgrade.

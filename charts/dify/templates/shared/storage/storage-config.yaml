@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "dify.fullname" . }}-shared-storage-config
+data:
+  STORAGE_TYPE: {{ .Values.persistence.type | quote }}
+  {{- if eq .Values.persistence.type "local" }}
+  STORAGE_LOCAL_PATH: {{ .Values.persistence.local.mountPath | quote }}
+  {{- end }}
+  {{- if eq .Values.persistence.type "s3" }}
+  S3_USE_AWS_MANAGED_IAM: {{ .Values.persistence.s3.useAwsManagedIam | quote }}
+  S3_ENDPOINT: {{ .Values.persistence.s3.endpoint | quote }}
+  S3_BUCKET_NAME: {{ .Values.persistence.s3.bucketName | quote }}
+  S3_REGION: {{ .Values.persistence.s3.region | quote }}
+  {{- end }}
+  {{- if eq .Values.persistence.type "azure-blob" }}
+  AZURE_BLOB_CONTAINER_NAME: {{ .Values.persistence.azureBlob.containerName | quote }}
+  AZURE_BLOB_ACCOUNT_URL: {{ .Values.persistence.azureBlob.accountUrl | quote }}
+  {{- end }}
+  {{- if eq .Values.persistence.type "aliyun-oss" }}
+  ALIYUN_OSS_BUCKET_NAME: {{ .Values.persistence.aliyunOss.bucketName | quote }}
+  ALIYUN_OSS_ENDPOINT: {{ .Values.persistence.aliyunOss.endpoint | quote }}
+  ALIYUN_OSS_REGION: {{ .Values.persistence.aliyunOss.region | quote }}
+
+  {{- end }}
+  {{- if eq .Values.persistence.type "google-storage" }}
+  GOOGLE_STORAGE_BUCKET_NAME: {{ .Values.persistence.googleStorage.bucketName | quote }}
+  {{- end }}
+  {{- if eq .Values.persistence.type "tencent-cos" }}
+  TENCENT_COS_BUCKET_NAME: {{ .Values.persistence.tencentCos.bucketName | quote }}
+  TENCENT_COS_REGION: {{ .Values.persistence.tencentCos.region | quote }}
+  TENCENT_COS_SCHEME: {{ .Values.persistence.tencentCos.scheme | quote }}
+  {{- end }}
+  {{- if eq .Values.persistence.type "huawei-obs" }}
+  HUAWEI_OBS_BUCKET_NAME: {{ .Values.persistence.huaweiObs.bucketName | quote }}
+  HUAWEI_OBS_SERVER: {{ .Values.persistence.huaweiObs.server | quote }}
+  {{- end }}
+  {{- if eq .Values.persistence.type "volcengine-tos" }}
+  VOLCENGINE_TOS_BUCKET_NAME: {{ .Values.persistence.volcengineTos.bucketName | quote }}
+  VOLCENGINE_TOS_ENDPOINT: {{ .Values.persistence.volcengineTos.endpoint | quote }}
+  VOLCENGINE_TOS_REGION: {{ .Values.persistence.volcengineTos.region | quote }}
+  {{- end }}

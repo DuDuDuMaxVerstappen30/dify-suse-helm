@@ -1,0 +1,43 @@
+# resources used by plugin live with controller
+{{- if .Values.plugin_controller.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: {{ include "dify.pluginRuntimeNamespace" . }}
+data:
+  default.conf: |
+    server {
+        {{- if .Values.plugin_connector.secure }}
+        listen 8081;
+        {{- else }}
+        listen 80;
+        {{- end }}
+
+        location / {
+            rewrite ^/([^/]+)/(.+)$ /$2 break;
+            proxy_pass http://127.0.0.1:8080;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            client_body_buffer_size  20M;
+            client_max_body_size     20M;
+            proxy_buffering off;
+            proxy_connect_timeout 10s;
+            proxy_send_timeout {{ .Values.plugin_daemon.pluginExecuteTimeout }}s;
+            proxy_read_timeout {{ .Values.plugin_daemon.pluginExecuteTimeout }}s;
+            keepalive_timeout {{ .Values.plugin_daemon.pluginExecuteTimeout }}s;
+            # proxy_buffer_size 128k;
+            # proxy_buffers 4 256k;
+            # proxy_busy_buffers_size 256k;
+            # proxy_temp_file_write_size 256k;
+        }
+    }
+{{- end }}
+---
+{{- if ne (include "dify.pluginRuntimeNamespace" .) (include "dify.pluginControlPlaneNamespace" .) }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ include "dify.pluginRuntimeNamespace" . }}
+{{- end }}

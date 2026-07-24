@@ -1,0 +1,81 @@
+{{- if .Values.plugin_manager.enabled }}
+{{- $dbInstance := include "dify.dbInstance" . | fromJson }}
+{{- $enterpriseDbName := include "dify.dbName" (dict "Values" .Values "credentialKey" "enterprise") }}
+{{- $difyDbName := include "dify.dbName" (dict "Values" .Values "credentialKey" "dify") }}
+{{- $pluginDbName := include "dify.dbName" (dict "Values" .Values "credentialKey" "plugin_daemon") }}
+{{- $runtimeNamespace := include "dify.pluginRuntimeNamespace" . }}
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "dify.fullname" . }}-plugin-manager-config
+data:
+  K8S_ENABLED: {{ .Values.plugin_manager.k8sEnabled | default "true" | quote }}
+  {{- if .Values.externalPrometheus.enabled }}
+  PROMETHEUS_ENABLED: {{ .Values.externalPrometheus.enabled | quote }}
+  PROMETHEUS_ENDPOINT: {{ .Values.externalPrometheus.endpoint }}
+  PROMETHEUS_TIMEOUT: {{ .Values.externalPrometheus.timeout | quote }}
+  PROMETHEUS_INSECURE: {{ .Values.externalPrometheus.insecure | quote }}
+  {{- end }}
+  METRIC_SOURCE: {{ .Values.plugin_manager.metric.source | default "disabled" | quote }}
+  {{- if eq .Values.plugin_manager.metric.source "cadvisor" }}
+  METRIC_TMP_DIR: {{ .Values.plugin_manager.metric.scrape.tmpDir | default "/tmp" | quote }}
+  METRIC_SCRAPE_INTERVAL: {{ .Values.plugin_manager.metric.scrape.scrapeInterval | default "20s" | quote }}
+  METRIC_SCRAPE_TIMEOUT: {{ .Values.plugin_manager.metric.scrape.scrapeTimeout | default "10s" | quote }}
+  METRIC_TSDB_BLOCK_SIZE_LIMIT_BYTES: {{ .Values.plugin_manager.metric.scrape.tsdbBlockSizeLimitBytes | default "536870912" | quote }}
+  METRIC_RETAIN_PERIOD: {{ .Values.plugin_manager.metric.scrape.retainPeriod | default "604800s" | quote }}
+  {{- end }}
+  PLUGIN_DR_ENABLED: {{ .Values.global.pluginDr.enabled | default false | quote }}
+  PLUGIN_CPU_REQUEST: {{ .Values.plugin_connector.pluginResourceRequests.cpu | quote }}
+  PLUGIN_MEMORY_REQUEST: {{ .Values.plugin_connector.pluginResourceRequests.memory | quote }}
+  NAMESPACE: {{ $runtimeNamespace | quote }}
+  # Service Configuration
+  SERVICE_HOST: {{ "0.0.0.0" | quote }}
+  SERVICE_PORT: {{ printf "%v" 8084 | quote }}
+  SERVER_TIMEOUT: {{ (.Values.enterprise.serverTimeout | default "60s") | quote }}
+  GRPC_SERVICE_HOST: {{ "0.0.0.0" | quote }}
+  GRPC_SERVICE_PORT: {{ printf "%v" 9084 | quote }}
+  GRPC_SERVER_TIMEOUT: {{ (.Values.enterprise.grpcServerTimeout | default "60s") | quote }}
+    
+  # Credential Sync Configuration
+  CREDENTIAL_SYNC_CRON: {{ "0 * * * *" | quote }}
+  CREDENTIAL_SYNC_TIMEOUT: {{ "30s" | quote }}
+
+  ENTERPRISE_CLIENT_TIMEOUT: {{ (.Values.plugin_manager.enterpriseClientTimeout | default "60s") | quote }}
+  
+  # Enterprise URLs
+  {{- if .Values.enterprise.enabled }}
+  ENTERPRISE_GRPC_ADDR: {{ (printf "%s-enterprise-svc:9000" (include "dify.fullname" .)) | quote }}
+  ENTERPRISE_HTTP_ADDR: {{ (printf "http://%s-enterprise-svc:8082" (include "dify.fullname" .)) | quote }}
+  {{- end }}
+  
+  # Plugin Daemon Configuration
+  {{- if .Values.plugin_daemon.enabled }}
+  DAEMON_CLIENT_ENDPOINT: {{ (printf "http://%s-plugin-daemon-svc:5002" (include "dify.fullname" .)) | quote }}
+  {{- end }}
+  
+  # DB Instance Configuration
+  DB_ENGINE: {{ $dbInstance.engine | quote }}
+  DB_HOST: {{ $dbInstance.host | quote }}
+  DB_PORT: {{ $dbInstance.port | toString | quote }}
+  DB_TZ: {{ $dbInstance.timezone | quote }}
+  DB_SSL_MODE: {{ $dbInstance.pg_ssl_mode | quote }}
+  DB_URI_SCHEME: {{ $dbInstance.pg_uri_scheme | quote }}
+  DB_EXTRAS: {{ $dbInstance.pg_extras | quote }}
+  DB_PARAMS: {{ $dbInstance.mysql_params | quote }}
+  DB_TLS: {{ $dbInstance.mysql_tls | toString | quote }}
+
+  ENTERPRISE_DB_NAME: {{ $enterpriseDbName | quote }}
+  ENTERPRISE_DB_USER: {{ (include "dify.dbCredentialUser" (dict "Values" .Values "credentialKey" "enterprise") | default $dbInstance.user) | quote }}
+  PLUGIN_DB_NAME: {{ $pluginDbName | quote }}
+  PLUGIN_DB_USER: {{ (include "dify.dbCredentialUser" (dict "Values" .Values "credentialKey" "plugin_daemon") | default $dbInstance.user) | quote }}
+  DIFY_DB_NAME: {{ $difyDbName | quote }}
+  DIFY_DB_USER: {{ (include "dify.dbCredentialUser" (dict "Values" .Values "credentialKey" "dify") | default $dbInstance.user) | quote }}
+
+  MARKETPLACE_ENABLED: {{ .Values.global.marketplace.enabled | toString | quote }}
+  {{- if .Values.global.marketplace.enabled }}
+  MARKETPLACE_URL: {{ .Values.global.marketplace.url | quote }}
+  {{- end }}
+
+  LOG_FORMAT: {{ .Values.global.log.outputFormat | default "json" | quote }}
+{{- end }}

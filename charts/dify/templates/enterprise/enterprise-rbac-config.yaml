@@ -1,0 +1,27 @@
+{{- $dbInstance := include "dify.dbInstance" . | fromJson }}
+{{- $enterpriseDbName := include "dify.dbName" (dict "Values" .Values "credentialKey" "enterprise") }}
+
+{{- if .Values.enterpriseRbac.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "dify.fullname" . }}-enterprise-rbac-config
+data:
+  SERVER_TIMEOUT: {{ .Values.enterpriseRbac.serverTimeout | quote }}
+  GRPC_SERVER_TIMEOUT: {{ .Values.enterpriseRbac.grpcServerTimeout | quote }}
+
+  # DB Instance
+  DB_ENGINE: {{ $dbInstance.engine | quote }}
+  DB_HOST: {{ $dbInstance.host | quote }}
+  DB_PORT: {{ $dbInstance.port | toString | quote }}
+  DB_TZ: {{ $dbInstance.timezone | quote }}
+  DB_SSL_MODE: {{ $dbInstance.pg_ssl_mode | quote }}
+  DB_URI_SCHEME: {{ $dbInstance.pg_uri_scheme | quote }}
+  DB_EXTRAS: {{ $dbInstance.pg_extras | toString | quote }}
+  DB_PARAMS: {{ $dbInstance.mysql_params | quote }}
+  DB_TLS: {{ $dbInstance.mysql_tls | toString | quote }}
+
+  # Enterprise DB
+  ENTERPRISE_DB_NAME: {{ $enterpriseDbName | quote }}
+  ENTERPRISE_DB_USER: {{ (include "dify.dbCredentialUser" (dict "Values" .Values "credentialKey" "enterprise") | default $dbInstance.user) | quote }}
+{{- end }}

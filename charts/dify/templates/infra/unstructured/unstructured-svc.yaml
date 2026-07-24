@@ -1,0 +1,18 @@
+{{- if .Values.unstructured.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "dify.fullname" . }}-unstructured-svc
+  labels:
+{{ include "dify.labels" . | indent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: unstructured
+      port: 8000
+      protocol: TCP
+      targetPort: 8000
+  selector:
+{{ include "dify.selectorLabels" . | indent 4 }}
+    app: {{ template "dify.fullname" . }}-unstructured
+{{- end }}

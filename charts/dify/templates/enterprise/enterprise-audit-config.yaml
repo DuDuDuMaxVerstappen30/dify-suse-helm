@@ -1,0 +1,85 @@
+{{- $dbInstance := include "dify.dbInstance" . | fromJson }}
+{{- $difyDbName := include "dify.dbName" (dict "Values" .Values "credentialKey" "dify") }}
+{{- $enterpriseDbName := include "dify.dbName" (dict "Values" .Values "credentialKey" "enterprise") }}
+{{- $auditDbName := include "dify.dbName" (dict "Values" .Values "credentialKey" "audit") }}
+
+{{- if .Values.enterpriseAudit.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "dify.fullname" . }}-enterprise-audit-config
+data:
+  # DB Instance
+  DB_ENGINE: {{ $dbInstance.engine | quote }}
+  DB_HOST: {{ $dbInstance.host | quote }}
+  DB_PORT: {{ $dbInstance.port | toString | quote }}
+  DB_TZ: {{ $dbInstance.timezone | quote }}
+  DB_SSL_MODE: {{ $dbInstance.pg_ssl_mode | quote }}
+  DB_URI_SCHEME: {{ $dbInstance.pg_uri_scheme | quote }}
+  DB_EXTRAS: {{ $dbInstance.pg_extras | toString | quote }}
+  DB_PARAMS: {{ $dbInstance.mysql_params | quote }}
+  DB_TLS: {{ $dbInstance.mysql_tls | toString | quote }}
+
+  DIFY_DB_NAME: {{ $difyDbName | quote }}
+  DIFY_DB_USER: {{ (include "dify.dbCredentialUser" (dict "Values" .Values "credentialKey" "dify") | default $dbInstance.user) | quote }}
+  ENTERPRISE_DB_NAME: {{ $enterpriseDbName | quote }}
+  ENTERPRISE_DB_USER: {{ (include "dify.dbCredentialUser" (dict "Values" .Values "credentialKey" "enterprise") | default $dbInstance.user) | quote }}
+  AUDIT_DB_NAME: {{ $auditDbName | quote }}
+  AUDIT_DB_USER: {{ (include "dify.dbCredentialUser" (dict "Values" .Values "credentialKey" "audit") | default $dbInstance.user) | quote }}
+
+  # Scheduler Related
+  OSS_SOLIDIFY_CRON: {{ .Values.enterpriseAudit.scheduler.solidifyCheckCron | quote }}
+  OSS_MIGRATION_DELAY_DAYS: {{ .Values.enterpriseAudit.scheduler.solidifyDelayDays | quote }}
+  OSS_SOLIDIFY_TIMEOUT: {{ .Values.enterpriseAudit.scheduler.timeout | quote }}
+
+  LOG_FORMAT: {{ .Values.global.log.outputFormat | default "json" | quote }}
+  # OSS Related
+  {{- $bucketName := "" }}
+  {{- with .Values.persistence }}
+    {{- if eq .type "s3" }}
+      {{- $bucketName = .s3.bucketName }}
+    {{- else if eq .type "azure-blob" }}
+      {{- $bucketName = .azureBlob.bucketName }}
+    {{- else if eq .type "aliyun-oss"}}
+      {{- $bucketName = .aliyunOss.bucketName }}
+    {{- else if eq .type "google-storage"}}
+      {{- $bucketName = .googleStorage.bucketName }}
+    {{- else if eq .type "tencent-cos"}}
+      {{- $bucketName = .tencentCos.bucketName }}
+    {{- else if eq .type "volcengine-tos"}}
+      {{- $bucketName = .volcengineTos.bucketName }}
+    {{- else if eq .type "huawei-obs"}}
+      {{- $bucketName = .huaweiObs.bucketName }}
+    {{- end }}
+  {{- end }}
+  STORAGE_BUCKET_NAME: "{{ $bucketName }}"
+  STORAGE_TYPE: {{ .Values.persistence.type | quote }}
+  AWS_REGION: {{ .Values.persistence.s3.region | quote }}
+  S3_USE_PATH_STYLE: "true"
+  S3_USE_AWS_MANAGED_IAM: {{ .Values.persistence.s3.useAwsManagedIam | quote }}
+  USE_AWS_S3: {{ .Values.persistence.s3.useAwsS3 | quote }}
+  TENCENT_COS_REGION: {{ .Values.persistence.tencentCos.region | quote }}
+  ALIYUN_OSS_REGION: {{ .Values.persistence.aliyunOss.region | quote }}
+  ALIYUN_OSS_ENDPOINT: {{ .Values.persistence.aliyunOss.endpoint | quote }}
+  ALIYUN_OSS_AUTH_VERSION: "v4"
+  ALIYUN_OSS_PATH: "/"
+  AZURE_BLOB_STORAGE_CONTAINER_NAME: {{ .Values.persistence.azureBlob.containerName | quote }}
+  AZURE_BLOB_STORAGE_USE_MANAGED_IDENTITY: {{ .Values.persistence.azureBlob.useManagedIdentity | quote }}
+  AZURE_BLOB_ACCOUNT_URL: {{ .Values.persistence.azureBlob.accountUrl | quote }}
+  
+  VOLCENGINE_TOS_ENDPOINT:  {{ .Values.persistence.volcengineTos.endpoint | quote}}
+  VOLCENGINE_TOS_REGION: {{ .Values.persistence.volcengineTos.region | quote}}
+  HUAWEI_OBS_SERVER: {{ .Values.persistence.huaweiObs.server | quote }}
+
+  # MQ Related
+  MQ_SHARD_COUNT: "7"
+  MQ_SYNC_THRESHOLD: {{ .Values.enterpriseAudit.mq.syncThreshold | toString | quote }}
+  MQ_CHECK_INTERVAL: {{ .Values.enterpriseAudit.mq.checkInterval | toString | quote }}
+  MQ_SYNC_MAX_WAIT: {{ .Values.enterpriseAudit.mq.maxWait | toString | quote }}
+
+  # Other
+  SERVER_TIMEOUT: {{ .Values.enterpriseAudit.serverTimeout | quote }}
+  GRPC_SERVER_TIMEOUT: {{ .Values.enterpriseAudit.grpcServerTimeout | quote }}
+  DOWNLOAD_AUDIT_LOGS_TIMEOUT: {{ .Values.enterpriseAudit.downloadTimeout | quote }}
+  
+{{- end }}
