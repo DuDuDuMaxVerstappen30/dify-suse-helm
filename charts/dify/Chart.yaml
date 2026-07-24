@@ -1,5 +1,5 @@
 annotations:
-  catalog.cattle.io/display-name: Dify Enterprise 3.11.1
+  catalog.cattle.io/display-name: Dify Enterprise 3.11.1 SUSE
   catalog.cattle.io/os: linux
 apiVersion: v2
 appVersion: 3.11.1
@@ -50,4 +50,4 @@ sources:
 - https://github.com/langgenius/dify
 - https://github.com/langgenius/dify-helm
 type: application
-version: 3.11.1-suse
+version: 3.11.1
