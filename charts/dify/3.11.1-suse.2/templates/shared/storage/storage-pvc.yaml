@@ -1,0 +1,29 @@
+{{- if and (eq .Values.persistence.type "local") (not .Values.persistence.local.persistentVolumeClaim.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ template "dify.fullname" . }}-backend-pvc
+  {{- with .Values.persistence.local.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  labels:
+    {{- include "dify.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    {{- if kindIs "slice" .Values.persistence.local.persistentVolumeClaim.accessModes }}
+    {{- toYaml .Values.persistence.local.persistentVolumeClaim.accessModes | nindent 4 }}
+    {{- else }}
+    - {{ .Values.persistence.local.persistentVolumeClaim.accessModes | quote }}
+    {{- end }}
+  {{- with .Values.persistence.local.persistentVolumeClaim.storageClass }}
+  {{- if eq . "-" }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.local.persistentVolumeClaim.size | quote }}
+{{- end }}

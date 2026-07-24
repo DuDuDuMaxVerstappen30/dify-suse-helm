@@ -1,0 +1,81 @@
+{{- if .Values.unstructured.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+{{- include "dify.labels" . | nindent 4 }}
+    app: {{ template "dify.fullname" . }}-unstructured
+  name: {{ template "dify.fullname" . }}-unstructured
+spec:
+  replicas: {{ .Values.unstructured.replicas }}
+  selector:
+    matchLabels:
+{{- include "dify.selectorLabels" . | nindent 6 }}
+      app: {{ template "dify.fullname" . }}-unstructured
+  template:
+    metadata:
+      labels:
+{{- include "dify.selectorLabels" . | nindent 8 }}
+        app: {{ template "dify.fullname" . }}-unstructured
+{{- include "dify.podExtraLabels" . | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- if include "dify.hasImagePullSecrets" . }}
+      imagePullSecrets:
+{{ include "dify.imagePullSecrets" . | nindent 8 }}
+      {{- end }}
+      {{- if include "dify.customCA.enabled" . }}
+      initContainers:
+      {{ include "dify.customCA.initContainer" . | nindent 6 }}
+      {{- end }}
+      containers:
+      - image: "{{ .Values.unstructured.image.repository }}:{{ .Values.unstructured.image.tag }}"
+        imagePullPolicy: "IfNotPresent"
+        name: {{ template "dify.fullname" . }}-unstructured
+        {{- if .Values.unstructured.extraEnv }}
+        env:
+          {{- toYaml .Values.unstructured.extraEnv | nindent 8 }}
+        {{- end }}
+        {{- if include "dify.customCA.enabled" . }}
+        envFrom:
+          - configMapRef:
+              name: {{ include "dify.customCA.configName" . }}
+        {{- end }}
+        ports:
+          - name: unstructured
+            containerPort: 8000
+            protocol: TCP
+        {{- if .Values.unstructured.readinessProbe }}
+        readinessProbe:
+          {{- toYaml .Values.unstructured.readinessProbe | nindent 12 }}
+        {{- end }}
+        {{- if .Values.unstructured.livenessProbe }}
+        livenessProbe:
+          {{- toYaml .Values.unstructured.livenessProbe | nindent 12 }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.unstructured.resources | nindent 12 }}
+        {{- if include "dify.customCA.enabled" . }}
+        volumeMounts:
+        {{ include "dify.customCA.volumeMount" . | nindent 8 }}
+        {{- end }}
+    {{- if include "dify.customCA.enabled" . }}
+      volumes:
+      {{ include "dify.customCA.volume" . | nindent 6 }}
+    {{- end }}
+    {{- if .Values.unstructured.serviceAccountName }}
+      serviceAccountName: {{ .Values.unstructured.serviceAccountName | quote }}
+    {{- end }}
+    {{- if .Values.unstructured.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.unstructured.nodeSelector | indent 8 }}
+    {{- end }}
+    {{- if .Values.unstructured.affinity }}
+      affinity:
+{{ toYaml .Values.unstructured.affinity | indent 8 }}
+    {{- end }}
+    {{- if .Values.unstructured.tolerations }}
+      tolerations:
+{{ toYaml .Values.unstructured.tolerations | indent 8 }}
+    {{- end }}
+{{- end }}

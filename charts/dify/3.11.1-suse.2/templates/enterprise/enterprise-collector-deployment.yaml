@@ -1,0 +1,112 @@
+{{- if .Values.enterpriseCollector.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+{{- include "dify.labels" . | nindent 4 }}
+    app: {{ template "dify.fullname" . }}-enterprise-collector
+  name: {{ template "dify.fullname" . }}-enterprise-collector
+spec:
+  replicas: {{ .Values.enterpriseCollector.replicas }}
+  selector:
+    matchLabels:
+{{- include "dify.selectorLabels" . | nindent 6 }}
+      app: {{ template "dify.fullname" . }}-enterprise-collector
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/enterprise/enterprise-collector-config.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/enterprise/enterprise-collector-secret.yaml") . | sha256sum }}
+        checksum/shared-redis-config: {{ include (print $.Template.BasePath "/shared/redis/redis-config.yaml") . | sha256sum }}
+        checksum/shared-redis-secret: {{ include (print $.Template.BasePath "/shared/redis/redis-secret.yaml") . | sha256sum }}
+        checksum/extra-config: {{ .Values.enterpriseCollector.extraConfig | sha256sum }}
+      labels:
+{{- include "dify.selectorLabels" . | nindent 8 }}
+        app: {{ template "dify.fullname" . }}-enterprise-collector
+{{- include "dify.podExtraLabels" . | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- if include "dify.hasImagePullSecrets" . }}
+      imagePullSecrets:
+{{ include "dify.imagePullSecrets" . | nindent 8 }}
+      {{- end }}
+      {{- if include "dify.customCA.enabled" . }}
+      initContainers:
+      {{ include "dify.customCA.initContainer" . | nindent 6 }}
+      {{- end }}
+      containers:
+      - image: "{{ .Values.enterpriseCollector.image.repository }}:{{ default .Chart.AppVersion .Values.enterpriseCollector.image.tag }}"
+        imagePullPolicy: "IfNotPresent"
+        name: {{ template "dify.fullname" . }}-enterprise-collector
+        env:
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        {{- if .Values.enterpriseCollector.extraEnv }}
+        {{- toYaml .Values.enterpriseCollector.extraEnv | nindent 10 }}
+        {{- end }}
+        envFrom:
+          - configMapRef:
+              name: {{ template "dify.fullname" . }}-enterprise-collector-config
+          - secretRef:
+              name: {{ template "dify.fullname" . }}-enterprise-collector-secret
+          - configMapRef:
+              name: {{ template "dify.fullname" . }}-shared-redis-config
+          - secretRef:
+              name: {{ template "dify.fullname" . }}-shared-redis-secret
+          {{- if include "dify.customCA.enabled" . }}
+          - configMapRef:
+              name: {{ include "dify.customCA.configName" . }}
+          {{- end }}
+        {{- if .Values.enterpriseCollector.readinessProbe }}
+        readinessProbe:
+          {{- toYaml .Values.enterpriseCollector.readinessProbe | nindent 12 }}
+        {{- end }}
+        {{- if .Values.enterpriseCollector.livenessProbe }}
+        livenessProbe:
+          {{- toYaml .Values.enterpriseCollector.livenessProbe | nindent 12 }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.enterpriseCollector.resources | nindent 12 }}
+        {{- if or .Values.enterpriseCollector.extraConfig (include "dify.customCA.enabled" .) }}
+        volumeMounts:
+          {{- if .Values.enterpriseCollector.extraConfig }}
+          - name: extra-config
+            mountPath: /app/config.yaml
+            subPath: config.yaml
+          {{- end }}
+          {{- if include "dify.customCA.enabled" . }}
+          {{ include "dify.customCA.volumeMount" . | nindent 10 }}
+          {{- end }}
+        {{- end }}
+    {{- if or .Values.enterpriseCollector.extraConfig (include "dify.customCA.enabled" .) }}
+      volumes:
+        {{- if .Values.enterpriseCollector.extraConfig }}
+        - name: extra-config
+          configMap:
+            name: {{ template "dify.fullname" . }}-enterprise-collector-extra-config
+            items:
+              - key: config.yaml
+                path: config.yaml
+        {{- end }}
+        {{- if include "dify.customCA.enabled" . }}
+        {{ include "dify.customCA.volume" . | nindent 8 }}
+        {{- end }}
+    {{- end }}
+    {{- if .Values.enterpriseCollector.serviceAccountName }}
+      serviceAccountName: {{ .Values.enterpriseCollector.serviceAccountName | quote }}
+    {{- end }}
+    {{- if .Values.enterpriseCollector.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.enterpriseCollector.nodeSelector | indent 8 }}
+    {{- end }}
+    {{- if .Values.enterpriseCollector.affinity }}
+      affinity:
+{{ toYaml .Values.enterpriseCollector.affinity | indent 8 }}
+    {{- end }}
+    {{- if .Values.enterpriseCollector.tolerations }}
+      tolerations:
+{{ toYaml .Values.enterpriseCollector.tolerations | indent 8 }}
+    {{- end }}
+{{- end }}

@@ -1,0 +1,14 @@
+{{- if .Values.enterpriseFrontend.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "dify.fullname" . }}-enterprise-frontend-config
+data:
+  API_URL: {{ include "dify.externalUrl" (dict "domain" .Values.global.enterpriseDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) | quote }}
+  AUDIT_LOG_MAX_SEARCH_INTERVAL: {{ .Values.enterpriseAudit.scheduler.solidifyDelayDays | quote }}
+  MARKETPLACE_ENABLED: {{ .Values.global.marketplace.enabled | toString | quote }}
+  RELEASE_VERSION: "{{ .Chart.Version }} (Helm)"
+  {{- if .Values.global.marketplace.enabled }}
+  MARKETPLACE_API_URL: {{ .Values.global.marketplace.apiUrl | quote }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,12 @@
+{{- if include "dify.customCA.enabled" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "dify.customCA.configName" . }}
+data:
+  SSL_CERT_FILE: {{ printf "%s/ca-bundle.crt" .Values.global.customCA.mountPath | quote }}
+  REQUESTS_CA_BUNDLE: {{ printf "%s/ca-bundle.crt" .Values.global.customCA.mountPath | quote }}
+  CURL_CA_BUNDLE: {{ printf "%s/ca-bundle.crt" .Values.global.customCA.mountPath | quote }}
+  NODE_EXTRA_CA_CERTS: {{ printf "%s/ca-bundle.crt" .Values.global.customCA.mountPath | quote }}
+  AWS_CA_BUNDLE: {{ printf "%s/ca-bundle.crt" .Values.global.customCA.mountPath | quote }}
+{{- end }}

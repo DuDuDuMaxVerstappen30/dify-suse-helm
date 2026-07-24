@@ -1,0 +1,122 @@
+{{- $controlPlaneNamespace := include "dify.pluginControlPlaneNamespace" . }}
+{{- $serviceAccountName := include "dify.pluginManagerServiceAccountName" . }}
+{{- $roleName := printf "%s-plugin-manager-role" (include "dify.fullname" .) }}
+{{- $roleBindingName := printf "%s-plugin-manager-rolebinding" (include "dify.fullname" .) }}
+{{- $clusterRoleName := printf "%s-plugin-manager-clusterrole" (include "dify.fullname" .) }}
+{{- $clusterRoleBindingName := printf "%s-plugin-manager-clusterrolebinding" (include "dify.fullname" .) }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: {{ template "dify.fullname" . }}-plugin-manager
+  name: {{ $serviceAccountName }}
+  namespace: {{ $controlPlaneNamespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $roleName }}
+  namespace: {{ $controlPlaneNamespace }}
+  labels:
+    app: {{ template "dify.fullname" . }}-plugin-manager
+rules:
+- apiGroups:
+  - enterprise.dify.ai
+  resources:
+  - difyplugins
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - enterprise.dify.ai
+  resources:
+  - difyplugins/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - enterprise.dify.ai
+  resources:
+  - difyplugins/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - "*"
+- apiGroups:
+  - ""
+  resources:
+  - events
+  - services
+  - configmaps
+  - pods
+  - pods/log
+  verbs:
+  - "*"
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - "*"
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - "*"
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - ingresses
+  verbs:
+  - "*"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $roleBindingName }}
+  namespace: {{ $controlPlaneNamespace }}
+  labels:
+    app: {{ template "dify.fullname" . }}-plugin-manager
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $roleName }}
+subjects:
+- kind: ServiceAccount
+  name: {{ $serviceAccountName }}
+  namespace: {{ $controlPlaneNamespace }}
+{{- if eq .Values.plugin_manager.metric.source "cadvisor" }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $clusterRoleName }}
+rules:
+- apiGroups: [""]
+  resources: ["nodes/proxy", "nodes"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $clusterRoleBindingName }}
+subjects:
+- kind: ServiceAccount
+  name: {{ $serviceAccountName }}
+  namespace: {{ $controlPlaneNamespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ $clusterRoleName }}
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

@@ -1,0 +1,105 @@
+{{- if and .Values.web.enabled}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+{{- include "dify.labels" . | nindent 4 }}
+    app: {{ template "dify.fullname" . }}-web
+  name: {{ template "dify.fullname" . }}-web
+spec:
+  replicas: {{ .Values.web.replicas }}
+  selector:
+    matchLabels:
+{{- include "dify.selectorLabels" . | nindent 6 }}
+      app: {{ template "dify.fullname" . }}-web
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/web/web-config.yaml") . | sha256sum }}
+      labels:
+{{- include "dify.selectorLabels" . | nindent 8 }}
+        app: {{ template "dify.fullname" . }}-web
+{{- include "dify.podExtraLabels" . | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- if include "dify.hasImagePullSecrets" . }}
+      imagePullSecrets:
+{{ include "dify.imagePullSecrets" . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.web.logoConfig.enabled }}
+      initContainers:
+      - name: init-decode-base64-for-logo
+        image: "{{ .Values.web.logoConfig.image.repository }}:{{ .Values.web.logoConfig.image.tag }}"
+        imagePullPolicy: "IfNotPresent"
+        command:
+        - sh
+        - -c
+        - |
+            echo "Decoding files from base64 to /tmp/..."
+            cat /config/favicon.ico.base64 | base64 -d > /tmp/favicon.ico && \
+            cat /config/logo-site.png.base64 | base64 -d > /tmp/logo-site.png
+            echo "Decoding files from base64 to /tmp/... done"
+        volumeMounts:
+        - name: web-config-for-logo
+          mountPath: /config
+        - name: web-config-logo-temp-volume
+          mountPath: /tmp
+      {{- end }}
+      containers:
+      - image: "{{ .Values.web.image.repository }}:{{ default .Chart.AppVersion .Values.web.image.tag }}"
+        imagePullPolicy: "IfNotPresent"
+        name: {{ template "dify.fullname" . }}-web
+        {{- if .Values.web.extraEnv }}
+        env:
+          {{- toYaml .Values.web.extraEnv | nindent 8 }}
+        {{- end }}
+        envFrom:
+          - configMapRef:
+              name: {{ template "dify.fullname" . }}-web-config
+        ports:
+          - name: web
+            containerPort: 3000
+            protocol: TCP
+        {{- if .Values.web.readinessProbe }}
+        readinessProbe:
+          {{- toYaml .Values.web.readinessProbe | nindent 12 }}
+        {{- end }}
+        {{- if .Values.web.livenessProbe }}
+        livenessProbe:
+          {{- toYaml .Values.web.livenessProbe | nindent 12 }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.web.resources | nindent 12 }}
+        {{- if .Values.web.logoConfig.enabled }}
+        volumeMounts:
+        - name: web-config-logo-temp-volume
+          mountPath: /app/web/public/favicon.ico
+          subPath: favicon.ico
+        - name: web-config-logo-temp-volume
+          mountPath: /app/web/public/logo/logo-site.png
+          subPath: logo-site.png
+        {{- end }}
+    {{- if .Values.web.logoConfig.enabled }}
+      volumes:
+      - name: web-config-for-logo
+        configMap:
+          name: {{ template "dify.fullname" . }}-web-config-for-logo
+      - name: web-config-logo-temp-volume
+        emptyDir: {}
+    {{- end }}
+    {{- if .Values.web.serviceAccountName }}
+      serviceAccountName: {{ .Values.web.serviceAccountName | quote }}
+    {{- end }}
+    {{- if .Values.web.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.web.nodeSelector | indent 8 }}
+    {{- end }}
+    {{- if .Values.web.affinity }}
+      affinity:
+{{ toYaml .Values.web.affinity | indent 8 }}
+    {{- end }}
+    {{- if .Values.web.tolerations }}
+      tolerations:
+{{ toYaml .Values.web.tolerations | indent 8 }}
+    {{- end }}
+{{- end }}

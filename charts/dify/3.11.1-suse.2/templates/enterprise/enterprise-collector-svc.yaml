@@ -1,0 +1,28 @@
+{{- if .Values.enterpriseCollector.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "dify.fullname" . }}-enterprise-collector-svc
+  labels:
+    app: {{ template "dify.fullname" . }}-enterprise-collector
+{{ include "dify.labels" . | indent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: otlp-grpc
+      port: 4317
+      protocol: TCP
+      targetPort: 4317
+    - name: otlp-http
+      port: 4318
+      protocol: TCP
+      targetPort: 4318
+    # collected metrics are exposed to this port by default
+    - name: http-metrics
+      port: 8889
+      protocol: TCP
+      targetPort: 8889
+  selector:
+{{ include "dify.selectorLabels" . | indent 4 }}
+    app: {{ template "dify.fullname" . }}-enterprise-collector
+{{- end }}

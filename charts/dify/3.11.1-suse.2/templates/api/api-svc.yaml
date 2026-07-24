@@ -1,0 +1,18 @@
+{{- if .Values.api.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "dify.fullname" . }}-api-svc
+  labels:
+{{ include "dify.labels" . | indent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: api
+      port: 5001
+      protocol: TCP
+      targetPort: 5001
+  selector:
+{{ include "dify.selectorLabels" . | indent 4 }}
+    app: {{ template "dify.fullname" . }}-api
+{{- end }}

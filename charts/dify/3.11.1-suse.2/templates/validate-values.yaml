@@ -1,0 +1,87 @@
+{{/*
+Fail early for value combinations that otherwise lead to partially running
+installations. The Rancher form mirrors these checks, while this template also
+protects Helm CLI users.
+*/}}
+{{- if .Values.enterprise.enabled }}
+  {{- if empty .Values.global.appSecretKey }}
+    {{- fail "global.appSecretKey is required (generate with: openssl rand -base64 42)" }}
+  {{- end }}
+  {{- if empty .Values.global.innerApiKey }}
+    {{- fail "global.innerApiKey is required (generate with: openssl rand -base64 42)" }}
+  {{- end }}
+  {{- if empty .Values.enterprise.appSecretKey }}
+    {{- fail "enterprise.appSecretKey is required (generate with: openssl rand -base64 42)" }}
+  {{- end }}
+  {{- if empty .Values.enterprise.adminAPIsSecretKeySalt }}
+    {{- fail "enterprise.adminAPIsSecretKeySalt is required" }}
+  {{- end }}
+  {{- if lt (len .Values.enterprise.passwordEncryptionKey) 43 }}
+    {{- fail "enterprise.passwordEncryptionKey must be a base64-encoded 32-byte key (generate with: openssl rand -base64 32)" }}
+  {{- end }}
+  {{- if and (eq .Values.enterprise.licenseMode "online") (empty .Values.enterprise.licenseServer) }}
+    {{- fail "enterprise.licenseServer is required when enterprise.licenseMode=online" }}
+  {{- end }}
+{{- end }}
+
+{{- if eq .Values.postgresql.enabled .Values.externalDatabase.enabled }}
+  {{- fail "enable exactly one database: postgresql.enabled or externalDatabase.enabled" }}
+{{- end }}
+{{- if and .Values.postgresql.enabled (empty .Values.postgresql.global.postgresql.auth.postgresPassword) }}
+  {{- fail "postgresql.global.postgresql.auth.postgresPassword is required for the bundled PostgreSQL database" }}
+{{- end }}
+{{- if .Values.externalDatabase.enabled }}
+  {{- if empty .Values.externalDatabase.host }}
+    {{- fail "externalDatabase.host is required when externalDatabase.enabled=true" }}
+  {{- end }}
+  {{- if empty .Values.externalDatabase.user }}
+    {{- fail "externalDatabase.user is required when externalDatabase.enabled=true" }}
+  {{- end }}
+  {{- if empty .Values.externalDatabase.password }}
+    {{- fail "externalDatabase.password is required when externalDatabase.enabled=true" }}
+  {{- end }}
+{{- end }}
+
+{{- if eq .Values.redis.enabled .Values.externalRedis.enabled }}
+  {{- fail "enable exactly one Redis service: redis.enabled or externalRedis.enabled" }}
+{{- end }}
+{{- if and .Values.redis.enabled (empty .Values.redis.global.redis.password) }}
+  {{- fail "redis.global.redis.password is required for the bundled Redis service" }}
+{{- end }}
+{{- if .Values.externalRedis.enabled }}
+  {{- if empty .Values.externalRedis.host }}
+    {{- fail "externalRedis.host is required when externalRedis.enabled=true" }}
+  {{- end }}
+  {{- if empty .Values.externalRedis.password }}
+    {{- fail "externalRedis.password is required when externalRedis.enabled=true" }}
+  {{- end }}
+{{- end }}
+
+{{- $internalVectorCount := add (ternary 1 0 .Values.qdrant.enabled) (ternary 1 0 .Values.weaviate.enabled) }}
+{{- if and .Values.vectorDB.useExternal (gt $internalVectorCount 0) }}
+  {{- fail "disable qdrant.enabled and weaviate.enabled when vectorDB.useExternal=true" }}
+{{- end }}
+{{- if and (not .Values.vectorDB.useExternal) (ne $internalVectorCount 1) }}
+  {{- fail "when vectorDB.useExternal=false, enable exactly one bundled vector database: qdrant or weaviate" }}
+{{- end }}
+{{- if and .Values.qdrant.enabled (empty .Values.qdrant.apiKey) }}
+  {{- fail "qdrant.apiKey is required for the bundled Qdrant service" }}
+{{- end }}
+
+{{- if .Values.ingress.enabled }}
+  {{- if empty .Values.global.consoleWebDomain }}
+    {{- fail "global.consoleWebDomain is required when ingress.enabled=true" }}
+  {{- end }}
+  {{- if empty .Values.global.serviceApiDomain }}
+    {{- fail "global.serviceApiDomain is required when ingress.enabled=true" }}
+  {{- end }}
+  {{- if empty .Values.global.appWebDomain }}
+    {{- fail "global.appWebDomain is required when ingress.enabled=true" }}
+  {{- end }}
+  {{- if empty .Values.global.filesDomain }}
+    {{- fail "global.filesDomain is required when ingress.enabled=true" }}
+  {{- end }}
+  {{- if empty .Values.global.enterpriseDomain }}
+    {{- fail "global.enterpriseDomain is required when ingress.enabled=true" }}
+  {{- end }}
+{{- end }}

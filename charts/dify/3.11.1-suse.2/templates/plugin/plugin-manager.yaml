@@ -1,0 +1,136 @@
+{{- if .Values.plugin_manager.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+{{- include "dify.labels" . | nindent 4 }}
+    app: {{ template "dify.fullname" . }}-plugin-manager
+  name: {{ template "dify.fullname" . }}-plugin-manager
+spec:
+  replicas: {{ .Values.plugin_manager.replicas }}
+  selector:
+    matchLabels:
+{{- include "dify.selectorLabels" . | nindent 6 }}
+      app: {{ template "dify.fullname" . }}-plugin-manager
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/plugin/plugin-manager-config.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/plugin/plugin-manager-secret.yaml") . | sha256sum }}
+        checksum/shared-redis-config: {{ include (print $.Template.BasePath "/shared/redis/redis-config.yaml") . | sha256sum }}
+        checksum/shared-redis-secret: {{ include (print $.Template.BasePath "/shared/redis/redis-secret.yaml") . | sha256sum }}
+      labels:
+{{- include "dify.selectorLabels" . | nindent 8 }}
+        app: {{ template "dify.fullname" . }}-plugin-manager
+{{- include "dify.podExtraLabels" . | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- if include "dify.hasImagePullSecrets" . }}
+      imagePullSecrets:
+{{ include "dify.imagePullSecrets" . | nindent 8 }}
+      {{- end }}
+      {{- if include "dify.customCA.enabled" . }}
+      initContainers:
+      {{ include "dify.customCA.initContainer" . | nindent 6 }}
+      {{- end }}
+      containers:
+      - image: "{{ .Values.plugin_manager.image.repository }}:{{ default .Chart.AppVersion .Values.plugin_manager.image.tag }}"
+        imagePullPolicy: "IfNotPresent"
+        name: {{ template "dify.fullname" . }}-plugin-manager
+        envFrom:
+          - configMapRef:
+              name: {{ template "dify.fullname" . }}-plugin-manager-config
+          - secretRef:
+              name: {{ template "dify.fullname" . }}-plugin-manager-secret
+          - configMapRef:
+              name: {{ template "dify.fullname" . }}-shared-redis-config
+          - secretRef:
+              name: {{ template "dify.fullname" . }}-shared-redis-secret
+          {{- if include "dify.customCA.enabled" . }}
+          - configMapRef:
+              name: {{ include "dify.customCA.configName" . }}
+          {{- end }}
+        env:
+        {{- if .Values.externalKubernetes.enabled }}
+          - name: USE_OTHER_CLUSTER
+            value: "true"
+        {{- else }}
+          - name: USE_OTHER_CLUSTER
+            value: ""
+        {{- end }}
+        {{- if .Values.plugin_manager.extraEnv }}
+          {{- toYaml .Values.plugin_manager.extraEnv | nindent 10 }}
+        {{- end }}
+        ports:
+          - name: http
+            containerPort: 8084
+            protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /v1/healthz
+            port: 8084
+        resources:
+          {{- toYaml .Values.plugin_manager.resources | nindent 12 }}
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        {{- if .Values.externalKubernetes.enabled }}
+        - name: kubeconfig
+          mountPath: /app/.kube
+          readOnly: true
+        {{- end }}
+        {{- if include "dify.customCA.enabled" . }}
+        {{ include "dify.customCA.volumeMount" . | nindent 8 }}
+        {{- end }}
+      serviceAccountName: {{ include "dify.pluginManagerServiceAccountName" . }}
+    {{- if .Values.plugin_manager.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.plugin_manager.nodeSelector | indent 8 }}
+    {{- end }}
+    {{- if .Values.plugin_manager.affinity }}
+      affinity:
+{{ toYaml .Values.plugin_manager.affinity | indent 8 }}
+    {{- end }}
+    {{- if .Values.plugin_manager.tolerations }}
+      tolerations:
+{{ toYaml .Values.plugin_manager.tolerations | indent 8 }}
+    {{- end }}
+      volumes:
+      - name: tmp
+        emptyDir:
+          medium: Memory
+          sizeLimit: 100Mi
+      {{- if .Values.externalKubernetes.enabled }}
+      - name: kubeconfig
+        secret:
+          secretName: {{ .Values.plugin_manager.kube.config.secret.name | quote }}
+          items:
+            - key: {{ .Values.plugin_manager.kube.config.secret.key | default "config" | quote }}
+              path: config
+      {{- end }}
+      {{- if include "dify.customCA.enabled" . }}
+      {{ include "dify.customCA.volume" . | nindent 6 }}
+      {{- end }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "dify.fullname" . }}-plugin-manager-svc
+  labels:
+{{ include "dify.labels" . | indent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8084
+      protocol: TCP
+      targetPort: 8084
+    - name: grpc
+      port: 9084
+      protocol: TCP
+      targetPort: 9084
+  selector:
+{{ include "dify.selectorLabels" . | indent 4 }}
+    app: {{ template "dify.fullname" . }}-plugin-manager
+{{- end }}

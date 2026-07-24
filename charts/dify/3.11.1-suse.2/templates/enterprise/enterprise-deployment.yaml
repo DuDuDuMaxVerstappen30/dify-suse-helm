@@ -1,0 +1,98 @@
+{{- if .Values.enterprise.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+{{- include "dify.labels" . | nindent 4 }}
+    app: {{ template "dify.fullname" . }}-enterprise
+  name: {{ template "dify.fullname" . }}-enterprise
+spec:
+  replicas: {{ .Values.enterprise.replicas }}
+  selector:
+    matchLabels:
+{{- include "dify.selectorLabels" . | nindent 6 }}
+      app: {{ template "dify.fullname" . }}-enterprise
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/enterprise/enterprise-config.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/enterprise/enterprise-secret.yaml") . | sha256sum }}
+        checksum/shared-redis-config: {{ include (print $.Template.BasePath "/shared/redis/redis-config.yaml") . | sha256sum }}
+        checksum/shared-redis-secret: {{ include (print $.Template.BasePath "/shared/redis/redis-secret.yaml") . | sha256sum }}        
+      labels:
+{{- include "dify.selectorLabels" . | nindent 8 }}
+        app: {{ template "dify.fullname" . }}-enterprise
+{{- include "dify.podExtraLabels" . | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      {{- if include "dify.hasImagePullSecrets" . }}
+      imagePullSecrets:
+{{ include "dify.imagePullSecrets" . | nindent 8 }}
+      {{- end }}
+      {{- if include "dify.customCA.enabled" . }}
+      initContainers:
+      {{ include "dify.customCA.initContainer" . | nindent 6 }}
+      {{- end }}
+      containers:
+      - image: "{{ .Values.enterprise.image.repository }}:{{ default .Chart.AppVersion .Values.enterprise.image.tag }}"
+        imagePullPolicy: "IfNotPresent"
+        name: {{ template "dify.fullname" . }}-enterprise
+        env:
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        {{- if .Values.enterprise.extraEnv }}
+        {{- toYaml .Values.enterprise.extraEnv | nindent 10 }}
+        {{- end }}
+        envFrom:
+          - configMapRef:
+              name: {{ template "dify.fullname" . }}-enterprise-config
+          - secretRef:
+              name: {{ template "dify.fullname" . }}-enterprise-secret
+          - configMapRef:
+              name: {{ template "dify.fullname" . }}-shared-redis-config
+          - secretRef:
+              name: {{ template "dify.fullname" . }}-shared-redis-secret
+          {{- if include "dify.customCA.enabled" . }}
+          - configMapRef:
+              name: {{ include "dify.customCA.configName" . }}
+          {{- end }}
+        ports:
+          - name: web
+            containerPort: 8082
+            protocol: TCP
+        {{- if .Values.enterprise.readinessProbe }}
+        readinessProbe:
+          {{- toYaml .Values.enterprise.readinessProbe | nindent 12 }}
+        {{- end }}
+        {{- if .Values.enterprise.livenessProbe }}
+        livenessProbe:
+          {{- toYaml .Values.enterprise.livenessProbe | nindent 12 }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.enterprise.resources | nindent 12 }}
+        {{- if include "dify.customCA.enabled" . }}
+        volumeMounts:
+        {{ include "dify.customCA.volumeMount" . | nindent 8 }}
+        {{- end }}
+    {{- if include "dify.customCA.enabled" . }}
+      volumes:
+      {{ include "dify.customCA.volume" . | nindent 6 }}
+    {{- end }}
+    {{- if .Values.enterprise.serviceAccountName }}
+      serviceAccountName: {{ .Values.enterprise.serviceAccountName | quote }}
+    {{- end }}
+    {{- if .Values.enterprise.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.enterprise.nodeSelector | indent 8 }}
+    {{- end }}
+    {{- if .Values.enterprise.affinity }}
+      affinity:
+{{ toYaml .Values.enterprise.affinity | indent 8 }}
+    {{- end }}
+    {{- if .Values.enterprise.tolerations }}
+      tolerations:
+{{ toYaml .Values.enterprise.tolerations | indent 8 }}
+    {{- end }}
+{{- end }}

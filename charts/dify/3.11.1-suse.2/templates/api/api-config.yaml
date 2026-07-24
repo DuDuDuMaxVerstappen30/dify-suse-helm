@@ -1,0 +1,108 @@
+{{- if .Values.api.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "dify.fullname" . }}-api-config
+data:
+  EDITION: {{ .Values.global.edition | quote }}
+  MODE: "api"
+  TZ: "UTC"
+  LOG_LEVEL: "INFO"
+  LOG_OUTPUT_FORMAT: {{ .Values.global.log.outputFormat | default "json" | quote }}
+  GUNICORN_TIMEOUT: "360"
+  DEPLOY_ENV: {{ .Values.api.deployEnv | quote }}
+  SERVER_WORKER_AMOUNT: {{ .Values.api.serverWorkerAmount | quote }}
+  CONSOLE_WEB_URL: {{ include "dify.externalUrl" (dict "domain" .Values.global.consoleWebDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) | quote }}
+  CONSOLE_API_URL: {{ include "dify.externalUrl" (dict "domain" .Values.global.consoleApiDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) | quote }}
+  SERVICE_API_URL: {{ include "dify.externalUrl" (dict "domain" .Values.global.serviceApiDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) | quote }}
+  APP_WEB_URL: {{ include "dify.externalUrl" (dict "domain" .Values.global.appWebDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) | quote }}
+  FILES_URL: {{ include "dify.externalUrl" (dict "domain" .Values.global.filesDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) | quote }}
+  MIGRATION_ENABLED: {{ .Values.global.dbMigrationEnabled | toString | quote }}
+  ENABLE_COLLABORATION_MODE: {{ .Values.collaboration.enabled | toString | quote }}
+  SQLALCHEMY_POOL_SIZE: {{ .Values.api.db.poolSize | quote }}
+  SQLALCHEMY_POOL_RECYCLE: {{ .Values.api.db.poolRecycle | quote }}
+  KEYWORD_DATA_SOURCE_TYPE: {{ .Values.global.rag.keywordDataSourceType | quote }}
+  TOP_K_MAX_VALUE: {{ .Values.global.rag.topKMaxValue | quote }}
+  INDEXING_MAX_SEGMENTATION_TOKENS_LENGTH: {{ .Values.global.rag.indexingMaxSegmentationTokensLength | quote }}
+  OAUTH_REDIRECT_PATH: {{ .Values.api.oauth.redirectPath | quote }}
+  CHECK_UPDATE_URL: {{ .Values.api.checkUpdateUrl | quote }}
+  UPLOAD_FILE_SIZE_LIMIT: {{ .Values.api.limits.uploadFileSize | toString | quote }}
+  UPLOAD_FILE_BATCH_LIMIT: {{ .Values.api.limits.uploadFileBatchCount | toString | quote }}
+  UPLOAD_IMAGE_FILE_SIZE_LIMIT: {{ .Values.api.limits.uploadImageFileSize | toString | quote }}
+  SWAGGER_UI_ENABLED: "false"
+  {{- if .Values.api.innerApi.enabled }}
+  INNER_API: "true"
+  {{- end }}
+  {{- if .Values.enterprise.enabled }}
+  ENTERPRISE_ENABLED: "true"
+  ENTERPRISE_API_URL: "http://{{ template "dify.fullname" . }}-enterprise-svc:8082/inner/api"
+  ENTERPRISE_PLUGIN_MANAGER_API_URL: "http://{{ template "dify.fullname" . }}-plugin-manager-svc:8084/v1/plugin-manager/inner"
+  {{- end }}
+  {{- if .Values.enterpriseRbac.enabled }}
+  RBAC_ENABLED: "true"
+  ENTERPRISE_RBAC_API_URL: "http://{{ template "dify.fullname" . }}-enterprise-rbac-svc:8086/inner/api"
+  {{- end }}
+  {{- if and .Values.enterprise.enabled .Values.global.otel.enabled }}
+  ENTERPRISE_TELEMETRY_ENABLED: "true"
+  ENTERPRISE_OTLP_ENDPOINT: "http://{{ template "dify.fullname" . }}-enterprise-collector-svc:4317"
+  ENTERPRISE_OTLP_PROTOCOL: "grpc"
+  {{- if .Values.global.otel.sender.otlp.headers }}
+  ENTERPRISE_OTLP_HEADERS: {{ .Values.global.otel.sender.otlp.headers | quote }}
+  {{- end }}
+  ENTERPRISE_INCLUDE_CONTENT: {{ .Values.global.otel.sender.includeContent | toString | quote }}
+  ENTERPRISE_SERVICE_NAME: {{ .Values.global.otel.sender.serviceName | quote }}
+  ENTERPRISE_OTEL_SAMPLING_RATE: {{ .Values.global.otel.samplingRate | default "1.0" | quote }}
+  {{- end }}
+  {{- if .Values.ssrfProxy.enabled }}
+  SSRF_PROXY_HTTP_URL: "http://{{ template "dify.fullname" . }}-ssrf-proxy-svc:3128"
+  SSRF_PROXY_HTTPS_URL: "http://{{ template "dify.fullname" . }}-ssrf-proxy-svc:3128"
+  {{- end }}
+  {{- if eq .Values.global.rag.etlType "Unstructured" }}
+  ETL_TYPE: "Unstructured"
+  UNSTRUCTURED_API_URL: "http://{{ template "dify.fullname" . }}-unstructured-svc:8000/general/v0/general"
+  {{- else }}
+  ETL_TYPE: "dify"
+  {{- end }}
+  {{- if .Values.api.webApiCorsAllowOrigins }}
+  WEB_API_CORS_ALLOW_ORIGINS: {{ .Values.api.webApiCorsAllowOrigins | quote }}
+  {{- end }}
+  {{- if .Values.api.consoleCorsAllowOrigins }}
+  CONSOLE_CORS_ALLOW_ORIGINS: {{ .Values.api.consoleCorsAllowOrigins | quote }}
+  {{- end }}
+  OPENAPI_ENABLED: {{ .Values.api.openapi.enabled | quote }}
+  OPENAPI_CORS_ALLOW_ORIGINS: {{ .Values.api.openapi.corsAllowOrigins | quote }}
+  OPENAPI_KNOWN_CLIENT_IDS: {{ .Values.api.openapi.knownClientIds | quote }}
+  OPENAPI_RATE_LIMIT_PER_TOKEN: {{ .Values.api.openapi.rateLimitPerToken | quote }}
+  ENABLE_OAUTH_BEARER: {{ .Values.api.enableOauthBearer | quote }}
+  CODE_EXECUTION_ENDPOINT: "http://{{ template "dify.fullname" . }}-sandbox-svc:8194"
+  TRIGGER_URL: {{ include "dify.externalUrl" (dict "domain" .Values.global.triggerDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) | quote }}
+  MODEL_LB_ENABLED: "true"
+  CAN_REPLACE_LOGO: "true"
+  {{- if .Values.api.sentry.enabled }}
+  SENTRY_DSN: {{ .Values.api.sentry.dsn | quote }}
+  SENTRY_TRACES_SAMPLE_RATE: {{ .Values.api.sentry.tracesSampleRate | quote }}
+  SENTRY_PROFILES_SAMPLE_RATE: {{ .Values.api.sentry.profilesSampleRate | quote }}
+  {{- end }}
+  POSITION_TOOL_PINS: {{ .Values.api.positionTool.pins | quote }}
+  POSITION_TOOL_INCLUDES: {{ .Values.api.positionTool.includes | quote }}
+  POSITION_TOOL_EXCLUDES: {{ .Values.api.positionTool.excludes | quote }}
+  POSITION_PROVIDER_PINS: {{ .Values.api.positionProvider.pins | quote }}
+  POSITION_PROVIDER_INCLUDES: {{ .Values.api.positionProvider.includes | quote }}
+  POSITION_PROVIDER_EXCLUDES: {{ .Values.api.positionProvider.excludes | quote }}
+
+  {{- if .Values.plugin_daemon.enabled }}
+  PLUGIN_REMOTE_INSTALL_HOST: {{ .Values.plugin_daemon.remoteInstallHost | quote }}
+  PLUGIN_REMOTE_INSTALL_PORT: {{ .Values.plugin_daemon.remoteInstallPort | quote }}
+  PLUGIN_MAX_PACKAGE_SIZE: "52428800"
+  INNER_API_KEY_FOR_PLUGIN: {{ .Values.global.innerApiKey | quote }}
+  PLUGIN_DAEMON_PORT: "5002"
+  PLUGIN_DAEMON_KEY: {{ .Values.global.innerApiKey }}
+  PLUGIN_DAEMON_URL: "http://{{ template "dify.fullname" . }}-plugin-daemon-svc:5002"
+  MARKETPLACE_ENABLED: {{ .Values.global.marketplace.enabled | toString | quote }}
+  MARKETPLACE_API_URL: {{ .Values.global.marketplace.apiUrl | quote }}
+  ENDPOINT_URL_TEMPLATE: "{{ include "dify.externalUrl" (dict "domain" .Values.global.consoleApiDomain "useTLS" .Values.global.useTLS "port" .Values.global.externalPort) }}/e/{hook_id}"
+  {{- end }}
+
+  {{- include "dify.otel.config" . | nindent 2 }}
+
+{{- end }}
