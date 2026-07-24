@@ -1,0 +1,26 @@
+apiVersion: v1
+entries:
+  dify:
+    - apiVersion: v2
+      appVersion: 3.11.1
+      created: "2026-07-24T00:00:00+08:00"
+      description: Dify Enterprise 3.11.1 with guided SUSE Rancher installation forms
+      digest: 140a7c41f36a5d859e6ffb97ba8a37f02e74098acf524252cce4db48ce797474
+      home: https://dify.ai
+      icon: https://avatars.githubusercontent.com/u/127165244
+      keywords:
+        - dify
+        - langgenius
+        - llm
+        - ai
+        - enterprise
+        - rancher
+      name: dify
+      sources:
+        - https://github.com/langgenius/dify
+        - https://github.com/langgenius/dify-helm
+      type: application
+      urls:
+        - https://raw.githubusercontent.com/DuDuDuMaxVerstappen30/dify-suse-helm/main/dify-3.11.1-suse.tgz
+      version: 3.11.1-suse
+generated: "2026-07-24T00:00:00+08:00"
